@@ -29,14 +29,16 @@ final class PlaceholderImage {
 			return 0;
 		}
 
-		$upload = wp_upload_bits( sanitize_title( $title ) . '.jpg', null, $this->render( $title, 1600, 900 ) );
+		// WebP when the server's GD supports it (smaller files for every size); JPEG otherwise.
+		$webp   = function_exists( 'imagewebp' );
+		$upload = wp_upload_bits( sanitize_title( $title ) . ( $webp ? '.webp' : '.jpg' ), null, $this->render( $title, 1600, 900, $webp ) );
 		if ( ! empty( $upload['error'] ) ) {
 			return 0;
 		}
 
 		$attachment_id = wp_insert_attachment(
 			array(
-				'post_mime_type' => 'image/jpeg',
+				'post_mime_type' => $webp ? 'image/webp' : 'image/jpeg',
 				'post_title'     => $title,
 				'post_status'    => 'inherit',
 			),
@@ -56,13 +58,14 @@ final class PlaceholderImage {
 	}
 
 	/**
-	 * Render JPEG bytes.
+	 * Render image bytes.
 	 *
 	 * @param string $seed   Seed text for colours.
 	 * @param int    $width  Width in px.
 	 * @param int    $height Height in px.
+	 * @param bool   $webp   WebP (true) or JPEG.
 	 */
-	private function render( string $seed, int $width, int $height ): string {
+	private function render( string $seed, int $width, int $height, bool $webp ): string {
 		$hash  = md5( $seed );
 		$image = imagecreatetruecolor( $width, $height );
 		imagealphablending( $image, true );
@@ -93,7 +96,11 @@ final class PlaceholderImage {
 		}
 
 		ob_start();
-		imagejpeg( $image, null, 82 );
+		if ( $webp ) {
+			imagewebp( $image, null, 80 );
+		} else {
+			imagejpeg( $image, null, 82 );
+		}
 		return (string) ob_get_clean();
 	}
 }

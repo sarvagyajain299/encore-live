@@ -1,0 +1,41 @@
+[
+  {
+    "Page": "home",
+    "Performance": 98,
+    "Accessibility": 100,
+    "BestPractices": 100,
+    "SEO": 92,
+    "LCP": "2.2 s",
+    "CLS": "0",
+    "TBT": "0 ms",
+    "FCP": "1.7 s",
+    "TTFB": "Root document took 1,300 ms",
+    "Runs": "98/98/98"
+  },
+  {
+    "Page": "archive",
+    "Performance": 99,
+    "Accessibility": 100,
+    "BestPractices": 100,
+    "SEO": 100,
+    "LCP": "1.9 s",
+    "CLS": "0",
+    "TBT": "0 ms",
+    "FCP": "1.7 s",
+    "TTFB": "Root document took 1,000 ms",
+    "Runs": "99/98/99"
+  },
+  {
+    "Page": "show",
+    "Performance": 99,
+    "Accessibility": 100,
+    "BestPractices": 100,
+    "SEO": 100,
+    "LCP": "1.8 s",
+    "CLS": "0",
+    "TBT": "0 ms",
+    "FCP": "1.7 s",
+    "TTFB": "Root document took 830 ms",
+    "Runs": "99/99/99"
+  }
+]
