@@ -48,7 +48,11 @@ switch ($Command) {
         Write-Host 'Site: http://localhost:8080  phpMyAdmin: http://localhost:8081  Mailpit: http://localhost:8025'
     }
     'down'     { Invoke-Compose down }
-    'install'  { Invoke-Compose run @RunFlags wpcli sh /scripts/install.sh }
+    'install'  {
+        # The plugin's PSR-4 autoloader is generated, not committed.
+        Invoke-Compose run @RunFlags tools composer install --no-interaction --no-dev -d wp-content/plugins/encore-core
+        Invoke-Compose run @RunFlags wpcli sh /scripts/install.sh
+    }
     'wp'       { Invoke-Compose run @RunFlags wpcli wp @Rest }
     'composer' { Invoke-Compose run @RunFlags tools composer @Rest }
     'phpcs'    { Initialize-Vendor; Invoke-Compose run @RunFlags tools vendor/bin/phpcs @Rest }

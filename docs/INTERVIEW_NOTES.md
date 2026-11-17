@@ -47,3 +47,93 @@ A: Both are hooks. Code registers callbacks with `add_action` or `add_filter`, a
 
 **Q3. How do you keep local, staging and production consistent but different?**
 A: Same code and the same container images. Everything that differs lives in environment variables: DB credentials, URLs, `WP_ENVIRONMENT_TYPE`, SMTP host. Code branches on `wp_get_environment_type()` rather than on hostnames. Secrets stay out of Git (`.env` is ignored and `.env.example` documents the keys). The install script is idempotent, so any environment can be rebuilt the same way.
+
+---
+
+## Phase 1: Plugin skeleton and content model
+
+### What was built
+- **Bootstrap.** `encore-core.php` only bootstraps. It loads Composer's PSR-4 autoloader, registers the activation and deactivation hooks, and on `plugins_loaded` calls `Plugin::instance()->boot()`.
+- **`Plugin`.** The single service-registration class. `services()` lists every service, and admin-only and CLI-only services are skipped on the front end. Each service implements `Contracts\Service::register()`.
+- **Content model:**
+  - `PostTypes`: `encore_show`, `encore_artist`, `encore_venue` (archives at `/shows/`, `/artists/`, `/venues/`)
+  - `Taxonomies`: `encore_genre` (shows + artists), `encore_city` (shows + venues)
+- **Meta.**
+  - `Meta\Fields` is the single source of truth. Each field has a type, REST schema, sanitizer and input control.
+  - `MetaRegistry` registers the fields with `register_post_meta`.
+  - One generic `Admin\MetaBox` renders and saves the form for all three post types.
+- **Domain:**
+  - `ShowStatus` and `Tier` are PHP 8.1 backed enums.
+  - `ShowStatusCalculator` holds the status rules as pure logic.
+  - `Support\Sanitizer` and `Support\Dates` hold pure helpers.
+- **Admin list.** Show date, Venue and Status columns. Show date is sortable and is the default order.
+- **WP-CLI.**
+  - `wp encore seed [--force]` creates 8 artists, 4 venues, 12 shows (9 upcoming, 3 past; one sold out, one cancelled). Each show gets a variable product with a General/Premium/VIP `Tier` attribute, and capacity is split 60/30/10 of the venue.
+  - Placeholder artwork is generated with GD, so no stock-photo licences are needed.
+  - `wp encore reset` deletes only what seed created (tagged `_encore_seeded`).
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Field definitions in one array (`Fields`) | The meta box and `register_post_meta` both read it, so they can't drift apart. Adding a field is one entry. |
+| `register_post_meta` *and* sanitizing in the meta box | Registered `sanitize_callback`s run on **every** write path (REST, WP-CLI, `update_post_meta`). The meta box sanitizing too is defence in depth, and PHPCS can see it. |
+| Leading underscore on meta keys (`_encore_start`) | "Protected" meta is hidden from the generic Custom Fields box. Only our UI (or REST with `auth_callback`) can change it. |
+| Datetimes stored as `Y-m-d H:i:s` site-local strings | String order equals time order, so `orderby=meta_value` sorts correctly. `Dates::from_meta()` attaches the `Asia/Dubai` timezone when we need real times. |
+| Backed enums for status and tier | They make invalid states unrepresentable in code. `tryFrom()` validates untrusted input in one call. |
+| Pure `ShowStatusCalculator` (time injected as `$now`) | The rules are testable in milliseconds, with no database and no clock. The seeder uses the same class, so demo data follows real rules. |
+| WooCommerce CRUD classes (`WC_Product_Variable`), never raw `update_post_meta` on products | WooCommerce keeps lookup tables, caches and price ranges in sync only through its CRUD layer. |
+| Separate `CliService` and `EncoreCommand` | WP-CLI turns **every public method** into a subcommand. `register()` would have become `wp encore register`. |
+| `'custom-fields'` support on the post types | Found while testing: without it, the REST API leaves out the `meta` object entirely, even for registered meta. |
+
+### Custom meta boxes vs ACF (agencies use ACF a lot)
+| | Our native meta boxes | Advanced Custom Fields |
+|---|---|---|
+| Build speed | Slower: you write rendering, saving and sanitizing | Very fast: fields are clicked together in the UI |
+| Dependencies | None | A plugin (Pro is paid) that the site depends on forever |
+| Version control | Fields live in code | Fields live in the DB unless you use Local JSON/PHP export |
+| Security | You must do nonces, caps and sanitizing yourself (shown here) | ACF handles it |
+| Performance | One meta row per field | Extra `_fieldname` reference rows per field |
+| When to choose | Core business data, public plugins, things that must survive a plugin removal | Marketing/content fields edited by non-developers, tight deadlines |
+
+### WordPress concepts
+- **Custom post types and taxonomies.** `register_post_type` and `register_taxonomy` run on `init`. Rewrite rules are cached in the `rewrite_rules` option, so we `flush_rewrite_rules()` **only on activation**. Flushing on every request is a classic performance bug.
+- **Activation vs deactivation vs uninstall.** Activate sets up (flush rules, version option). Deactivate cleans transient state but keeps data. Deleting data belongs only in uninstall.
+- **Nonces.** `wp_nonce_field()` and `wp_verify_nonce()` give CSRF protection: they prove that *this user's session* submitted *this form* recently. A nonce is not authorisation, so we still call `current_user_can( 'edit_post', $id )`.
+- **Save flow.** On `save_post_{type}`: nonce, then skip autosave/revision, then capability, then sanitize, then `update_post_meta`. Use `wp_unslash()` first, because WordPress adds slashes to `$_POST`.
+- **Escaping on output.** `esc_html`, `esc_attr`, `esc_url`, `esc_textarea` at the point of echo, matched to the context (HTML body vs attribute vs URL).
+- **Hooks used.**
+  - Filters: `manage_{type}_posts_columns` and `manage_edit-{type}_sortable_columns` change a value and return it.
+  - Actions: `manage_{type}_posts_custom_column` and `pre_get_posts` do something.
+  - `pre_get_posts` changes the main admin query by reference before SQL runs.
+- **WP-CLI commands.** Docblocks become `wp help` text. `## OPTIONS` defines the flags.
+
+### Verification (run on 2026-11-17)
+| Check | Command | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (34 tests, 60 assertions)` |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | 23 files, exit 0 |
+| Seed | `.\scripts\encore.ps1 seed` | 8 artists, 4 venues, 12 shows: 8 on_sale, 1 sold_out, 1 cancelled, 3 archived |
+| Reset | `.\scripts\encore.ps1 reset` | 56 items removed (24 posts + 12 products + 20 images) |
+| Meta box | logged-in POST to `post.php` with bad values | `2027-02-31`→`''`, `7pm`→`''`, age `17`→`0`, status `hacked`→`on_sale` |
+| CSRF | the same POST with a forged nonce | meta unchanged |
+
+### Practice questions
+
+**Q1. Walk me through what happens when an editor clicks "Update" on a show.**
+A: WordPress posts the form to `post.php` and verifies its own `_wpnonce`, then fires `save_post_encore_show`. Our `MetaBox::save()` then runs these checks in order:
+1. It checks our own nonce, so the request is proven to come from our form (CSRF protection).
+2. It skips autosaves and revisions, because they don't carry our fields.
+3. It checks `current_user_can( 'edit_post', $id )`, because a nonce proves who sent the request, not what they may do.
+4. It unslashes each field and runs it through that field's sanitizer, then calls `update_post_meta`.
+5. That call triggers the sanitizer registered with `register_post_meta` again. Sanitizers are idempotent, so the second pass is harmless and protects the REST and CLI paths too.
+
+**Q2. Why is `ShowStatusCalculator` a separate class with `$now` as a parameter?**
+A: Business rules shouldn't depend on WordPress or the clock. With time injected I can test edge cases deterministically, such as a show ending exactly now, a cancelled show in the past, or a sold-out show that gets restocked. Sold-out sync (Phase 3) and archiving (Phase 6) will call the same class, so the rules live in one place.
+
+**Q3. How would this content model change for 100,000 shows?**
+A: Meta queries (`meta_key` sort, `meta_query` filters) on `wp_postmeta` get slow, because `meta_value` is a non-indexed `LONGTEXT`. I would:
+1. Keep taxonomies for filtering, because term relationships are indexed.
+2. Move hot sortable fields such as the start time into a custom table with proper indexes, synced on `save_post`.
+3. Add an object cache (Redis).
+4. Use `no_found_rows` where we don't paginate.
+Phase 5 shows the custom-table approach for the waitlist.
