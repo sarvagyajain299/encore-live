@@ -10,7 +10,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('up', 'down', 'install', 'wp', 'composer', 'phpcs', 'phpcbf', 'test', 'seed', 'reset', 'shell', 'destroy', 'help')]
+    [ValidateSet('up', 'down', 'install', 'wp', 'composer', 'phpcs', 'phpcbf', 'test', 'seed', 'reset', 'demo', 'shell', 'destroy', 'help')]
     [string]$Command = 'help',
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -58,8 +58,9 @@ switch ($Command) {
     'phpcs'    { Initialize-Vendor; Invoke-Compose run @RunFlags tools vendor/bin/phpcs @Rest }
     'phpcbf'   { Initialize-Vendor; Invoke-Compose run @RunFlags tools vendor/bin/phpcbf @Rest }
     'test'     { Initialize-Vendor; Invoke-Compose run @RunFlags tools vendor/bin/phpunit @Rest }
-    'seed'     { Invoke-Compose run @RunFlags wpcli wp encore seed @Rest }   # command arrives in Phase 1
-    'reset'    { Invoke-Compose run @RunFlags wpcli wp encore reset @Rest }  # command arrives in Phase 1
+    'seed'     { Invoke-Compose run @RunFlags wpcli wp encore seed @Rest }
+    'reset'    { Invoke-Compose run @RunFlags wpcli wp encore reset @Rest }
+    'demo'     { Invoke-Compose run @RunFlags wpcli sh /scripts/demo-pages.sh }
     'shell'    { Invoke-Compose exec wordpress bash }
     'destroy' {
         $answer = Read-Host "This deletes the database and WordPress volumes. Type 'yes' to continue"

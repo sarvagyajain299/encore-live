@@ -52,8 +52,9 @@ case "$cmd" in
 	phpcs)    ensure_vendor; dc run "${run_flags[@]}" tools vendor/bin/phpcs "$@" ;;
 	phpcbf)   ensure_vendor; dc run "${run_flags[@]}" tools vendor/bin/phpcbf "$@" ;;
 	test)     ensure_vendor; dc run "${run_flags[@]}" tools vendor/bin/phpunit "$@" ;;
-	seed)     dc run "${run_flags[@]}" wpcli wp encore seed "$@" ;;   # command arrives in Phase 1
-	reset)    dc run "${run_flags[@]}" wpcli wp encore reset "$@" ;;  # command arrives in Phase 1
+	seed)     dc run "${run_flags[@]}" wpcli wp encore seed "$@" ;;
+	reset)    dc run "${run_flags[@]}" wpcli wp encore reset "$@" ;;
+	demo)     dc run "${run_flags[@]}" wpcli sh /scripts/demo-pages.sh ;;
 	shell)    dc exec wordpress bash ;;
 	# TODO(sarvagya): add a `logs` command that follows one service's logs.
 	#   Usage: scripts/encore.sh logs wordpress   (no service = all services)
