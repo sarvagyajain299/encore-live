@@ -18,3 +18,4 @@ require_once __DIR__ . '/inc/assets.php';
 require_once __DIR__ . '/inc/template-tags.php';
 require_once __DIR__ . '/inc/az-menu.php';
 require_once __DIR__ . '/inc/elementor.php';
+require_once __DIR__ . '/inc/performance.php';
