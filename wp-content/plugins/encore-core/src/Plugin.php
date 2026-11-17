@@ -10,6 +10,7 @@ namespace EncoreCore;
 use EncoreCore\Admin\MetaBox;
 use EncoreCore\Admin\SettingsPage;
 use EncoreCore\Analytics\DataLayer;
+use EncoreCore\Performance\PageCachePurge;
 use EncoreCore\Seo\YoastIntegration;
 use EncoreCore\Shows\ArchiveJob;
 use EncoreCore\Integrations\Elementor\ElementorIntegration;
@@ -117,6 +118,7 @@ final class Plugin {
 			$services[] = new AttendeePhoneField();
 			$services[] = new ShowStatusSync();
 			$services[] = new WaitlistModule();
+			$services[] = new PageCachePurge();
 			if ( ! is_admin() ) {
 				$services[] = new TicketPanel();
 				$services[] = new DataLayer();

@@ -24,6 +24,7 @@ x-wp-env: &wp-env
   WP_ENVIRONMENT_TYPE: ${WP_ENVIRONMENT_TYPE:-local}
   ENCORE_SMTP_HOST: ${ENCORE_SMTP_HOST:-mailpit}
   ENCORE_SMTP_PORT: ${ENCORE_SMTP_PORT:-1025}
+  WP_CACHE: ${WP_CACHE:-false}
   WORDPRESS_CONFIG_EXTRA: |
     define( 'WP_ENVIRONMENT_TYPE', getenv_docker( 'WP_ENVIRONMENT_TYPE', 'production' ) );
     define( 'WP_DEBUG_LOG', true );
@@ -32,6 +33,10 @@ x-wp-env: &wp-env
     // also can't work here: it calls the site URL (localhost:8080), which is not
     // reachable from inside the container. Real servers use system cron the same way.
     define( 'DISABLE_WP_CRON', true );
+    // Page cache (WP Super Cache) on/off per environment from .env.
+    if ( ! defined( 'WP_CACHE' ) ) {
+      define( 'WP_CACHE', filter_var( getenv_docker( 'WP_CACHE', 'false' ), FILTER_VALIDATE_BOOLEAN ) );
+    }
 
 services:
   db:

@@ -28,6 +28,8 @@ function Get-Graph([string]$Html) {
 # Local installs are 'discourage search engines' (blog_public=0), which makes core print
 # noindex everywhere and Yoast skip its own robots/canonical tags. Test as production would run.
 docker compose run --rm -T wpcli wp option update blog_public 1 2>$null | Out-Null
+# Option changes don't purge the page cache; drop pages cached while the site was noindex.
+docker compose run --rm -T wpcli wp eval 'if ( function_exists( "wp_cache_clear_cache" ) ) { wp_cache_clear_cache(); }' 2>$null | Out-Null
 
 # Event in Yoast's single graph.
 $html = (Get-Page '/shows/layla-haddad-brunch-is-a-personality/').Content
@@ -81,6 +83,7 @@ $next = ((docker compose run --rm -T wpcli wp cron event list --hook=encore_arch
 Test-Step 'archive job is scheduled daily' ($next -match '1 day') $next
 
 docker compose run --rm -T wpcli wp option update blog_public 0 2>$null | Out-Null
+docker compose run --rm -T wpcli wp eval 'if ( function_exists( "wp_cache_clear_cache" ) ) { wp_cache_clear_cache(); }' 2>$null | Out-Null
 Write-Host ""
 Write-Host "$pass passed, $fail failed"
 if ($fail) { exit 1 }

@@ -71,6 +71,12 @@ wp theme activate encore-theme
 echo "==> Yoast SEO: titles, meta, noindex rules, breadcrumbs"
 wp eval-file /scripts/seo-config.php
 
+echo "==> Page cache: WP Super Cache (on/off via WP_CACHE in .env)"
+# WP Super Cache writes define('WP_CACHE', true) into wp-config.php; the constant comes
+# from .env instead (docker-compose WORDPRESS_CONFIG_EXTRA), so remove its copy.
+sed -i '/Added by WP-Cache Manager/d' /var/www/html/wp-config.php 2>/dev/null || true
+wp eval-file /scripts/cache-config.php
+
 echo "==> Elementor: pages and posts only; show/artist/venue pages stay theme-rendered"
 wp option update elementor_cpt_support '["page","post"]' --format=json
 # Let the theme's colours and fonts apply inside Elementor instead of Elementor's defaults.
