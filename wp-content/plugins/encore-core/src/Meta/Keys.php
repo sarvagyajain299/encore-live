@@ -28,6 +28,10 @@ final class Keys {
 	public const SHOW_AGE     = '_encore_age_restriction';
 	public const SHOW_STATUS  = '_encore_status';
 
+	// One row per artist (non-single meta), maintained by ArtistIndex, so
+	// "shows by artist" is an exact '=' match instead of a LIKE on serialized data.
+	public const SHOW_ARTIST_INDEX = '_encore_artist';
+
 	// Artist.
 	public const ARTIST_BIO    = '_encore_bio';
 	public const ARTIST_SOCIAL = '_encore_social';
