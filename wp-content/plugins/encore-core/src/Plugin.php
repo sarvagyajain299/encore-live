@@ -14,6 +14,9 @@ use EncoreCore\Content\PostTypes;
 use EncoreCore\Content\Taxonomies;
 use EncoreCore\Contracts\Service;
 use EncoreCore\Meta\MetaRegistry;
+use EncoreCore\Shows\ArchiveFilters;
+use EncoreCore\Shows\ArtistIndex;
+use EncoreCore\Shows\SearchScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -79,7 +82,13 @@ final class Plugin {
 			new PostTypes(),
 			new Taxonomies(),
 			new MetaRegistry(),
+			new ArtistIndex(),
 		);
+
+		if ( ! is_admin() ) {
+			$services[] = new ArchiveFilters();
+			$services[] = new SearchScope();
+		}
 
 		if ( is_admin() ) {
 			$services[] = new MetaBox( PostTypes::SHOW, __( 'Show details', 'encore-core' ) );
