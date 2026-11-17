@@ -27,6 +27,7 @@ final class Lifecycle {
 		( new PostTypes() )->register_post_types();
 		( new Taxonomies() )->register_taxonomies();
 		flush_rewrite_rules();
+		\EncoreCore\Waitlist\Schema::install();
 		update_option( 'encore_core_version', ENCORE_CORE_VERSION );
 	}
 
