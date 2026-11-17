@@ -581,6 +581,23 @@ textarea {
 .tier-form__qty label { font-weight: 800; }
 .tier-form__hint { margin: 0; color: var(--c-muted); font-size: var(--step--1); }
 
+/* Waitlist form (markup from encore-core's WaitlistForm) */
+.waitlist { margin-block-start: var(--space-5); padding-block-start: var(--space-5); border-block-start: 1px solid var(--c-border); }
+.waitlist__title { font-size: var(--step-1); margin-block-end: var(--space-2); }
+.waitlist__intro { color: var(--c-muted); font-size: var(--step--1); }
+.waitlist__form { display: grid; gap: var(--space-3); }
+.waitlist__form .field { display: grid; gap: var(--space-1); margin: 0; }
+.waitlist__form label { font-weight: 700; font-size: var(--step--1); }
+.waitlist__form .field--check { grid-template-columns: auto 1fr; align-items: start; gap: var(--space-2); }
+.waitlist__form .field--check input { inline-size: 1.25rem; block-size: 1.25rem; margin-block-start: 0.15rem; accent-color: var(--c-accent); }
+.waitlist__form .field--check label { font-weight: 400; }
+.waitlist__form [aria-invalid="true"] { border-color: var(--c-cancelled); }
+.field__error { color: var(--c-cancelled); font-size: var(--step--1); font-weight: 700; }
+.waitlist__message:empty { display: none; }
+.waitlist__message { margin: 0; padding: var(--space-3); border-radius: var(--radius-small); background: var(--c-surface-2); font-weight: 700; }
+/* Honeypot: off-screen rather than display:none, which some bots detect. */
+.waitlist__hp { position: absolute; inset-inline-start: -9999px; inline-size: 1px; block-size: 1px; overflow: hidden; }
+
 @media (min-width: 900px) {
 	.show-layout { grid-template-columns: minmax(0, 1fr) 380px; }
 	.show-layout__aside { position: sticky; inset-block-start: calc(var(--header-height) + var(--space-5)); }
