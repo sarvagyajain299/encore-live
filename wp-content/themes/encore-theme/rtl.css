@@ -1,0 +1,21 @@
+/*
+ * RTL adjustments (loaded only when is_rtl()).
+ *
+ * Most layout already flips on its own, because main.css uses logical
+ * properties (margin-inline-start, inset-inline-end, ...) instead of
+ * left/right. Only direction-dependent visuals need overrides here.
+ */
+
+/* Gradient that darkens the text side of hero images. */
+.hero__media::after,
+.show-hero__media::after {
+	background:
+		linear-gradient(to top, var(--c-bg) 2%, rgb(12 11 17 / 0.55) 45%, rgb(12 11 17 / 0.15)),
+		linear-gradient(to left, rgb(12 11 17 / 0.7), transparent 70%);
+}
+
+/* Latin wordmark keeps its letter order. */
+.wordmark { direction: ltr; }
+
+/* Arabic needs no negative tracking; it breaks letter joins. */
+h1, h2, h3, h4, .wordmark, .eyebrow, .badge { letter-spacing: 0; }

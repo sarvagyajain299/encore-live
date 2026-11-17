@@ -9,7 +9,10 @@
     "autoload": {
         "psr-4": {
             "EncoreCore\\": "src/"
-        }
+        },
+        "files": [
+            "src/template-functions.php"
+        ]
     },
     "config": {
         "optimize-autoloader": true,

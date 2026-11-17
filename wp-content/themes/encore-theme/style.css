@@ -1,0 +1,14 @@
+/*
+Theme Name:        Encore Theme
+Theme URI:         https://github.com/sarvagyajain299/encore-live
+Description:       Presentation layer for Encore Live, a fictional Dubai comedy and live-music promoter. Classic PHP theme, mobile-first, accessible, RTL-ready, Elementor-compatible. Business logic lives in the encore-core plugin.
+Version:           0.3.0
+Requires at least: 6.5
+Requires PHP:      8.2
+Author:            Sarvagya Jain
+License:           GPL-2.0-or-later
+Text Domain:       encore-theme
+Tags:              dark, accessibility-ready, rtl-language-support, custom-menu, featured-images
+
+Styles live in assets/css/main.css. This file only carries the theme header.
+*/

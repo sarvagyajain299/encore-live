@@ -31,6 +31,8 @@
 	-->
 	<rule ref="WordPress.Files.FileName">
 		<exclude-pattern>*/encore-core/src/*</exclude-pattern>
+		<!-- Template hierarchy: single-{post_type}.php must contain the post type's underscore. -->
+		<exclude-pattern>*/encore-theme/*-encore_*.php</exclude-pattern>
 	</rule>
 
 	<!-- Every translatable string must use one of our text domains. -->
