@@ -318,3 +318,77 @@ A refund with "restock" calls the same stock functions, so the show returns to `
 
 **Q3. Classic checkout vs Checkout block: what changes for a developer?**
 A: The block checkout is React, talking to the Store API, so PHP filters that edit checkout HTML or `woocommerce_checkout_fields` don't apply. For fields you use the Additional Checkout Fields API (PHP registration, server-side validate/sanitize hooks). For cart line data, `woocommerce_get_item_data` still works because the Store API reads it. For order creation, `woocommerce_checkout_create_order_line_item` still fires. Payment gateways need a JS registration as well as the PHP class. Always test both the classic path and the Store API path, as our smoke test does.
+
+---
+
+## Phase 4: Shortcodes, REST API and Elementor widget
+
+### What was built
+- **Shortcodes** (`Shows\Shortcodes`): `[encore_upcoming_shows limit city genre]` and `[encore_artist_shows artist]`.
+- **Shared renderer** (`Shows\ShowListRenderer`). Turns filters into cached HTML.
+  - Cache invalidation uses a **version number**, bumped on `save_post_{type}`, `deleted_post`, `trashed_post` and `encore_show_status_changed`.
+  - Card markup comes from the theme's `template-parts/show-card.php` when it exists; otherwise from the plugin's `templates/show-card.php`.
+- **REST API** (`Rest\ShowsController`, `Rest\ShowSerializer`): `GET /encore/v1/shows` and `GET /encore/v1/shows/{id}`.
+  - `args` schemas cover type, enum, min/max and pattern.
+  - An explicit `permission_callback` and `X-WP-Total` / `X-WP-TotalPages` headers.
+  - The serializer defines the public contract (`docs/INTEGRATION_CONTRACT.md`).
+- **Elementor widget** "Encore Upcoming Shows" (`Integrations\Elementor\UpcomingShowsWidget`). Controls for number, city (from terms) and genre. It reuses `ListFilters` and `ShowListRenderer`.
+- **Input normalisation** (`Shows\ListFilters`, pure). `"Abu Dhabi"` becomes `abu-dhabi`, limits are capped, and cache keys are order-independent.
+- **`demo` command.** Creates a block page with both shortcodes and an Elementor-built page using the widget.
+- **`scripts/smoke-api.ps1`.** 14 HTTP checks for the API, shortcodes and widget.
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| One query builder, one renderer, three front doors | The shortcode, widget and archive can never disagree about which shows appear. A bug fixed once is fixed everywhere. The brief's DRY requirement. |
+| Version-number cache invalidation | You can't efficiently delete "all transients starting with `encore_list_`", and it's impossible with Redis. Bumping one number makes every old key unreachable instantly; old entries expire by TTL. Same idea as cache-busting `?ver=` on assets. |
+| Invalidate on `encore_show_status_changed` too | Selling out changes what a card shows (badge, price), but no post is saved. |
+| Theme card first, plugin fallback | Shortcodes look native in our theme but still work if the theme is swapped. This is the WooCommerce template-override pattern. |
+| A serializer class for API output | The response shape is the public contract. Internal names (`_encore_product_id`, `map_url`) never leak, and a unit test fails if someone accidentally exposes one. |
+| `permission_callback => true`, written as a method with a docblock | Public data is a deliberate decision. Since WP 5.5, omitting the callback triggers a notice. Making it explicit is what reviewers look for. |
+| `null` instead of `""` for missing values | API clients can distinguish "unknown" from "empty". |
+
+### Bug found while testing (good interview story)
+`?from=01-12-2026` was **accepted** although the arg had `'pattern' => '^\d{4}-\d{2}-\d{2}$'`.
+- **Cause:** when an arg defines its own `sanitize_callback`, WordPress does not apply the default schema validation unless `validate_callback` is set. Fix: `'validate_callback' => 'rest_validate_request_arg'`.
+- **Follow-up:** the `''` default then failed its own pattern and broke every request, so the default was removed for `from` and `to`.
+- **Lesson:** test the API with bad input, not only good input.
+
+### WordPress concepts
+- **Shortcodes.** `add_shortcode( $tag, $callback )`. The callback gets `$atts` (an array, or `''` when none are given) and must **return** a string. `shortcode_atts()` merges defaults and drops unknown attributes. It also fires `shortcode_atts_{$tag}`, so others can filter the defaults.
+- **REST routes.** `register_rest_route( $namespace, $route, [ methods, callback, permission_callback, args ] )` on `rest_api_init`.
+  - Route regex: `(?P<id>\d+)`.
+  - In `args`: `type`, `default`, `enum`, `minimum`/`maximum`, `pattern`, `validate_callback`, `sanitize_callback`.
+  - `WP_REST_Response` sets headers. Return `WP_Error` with `['status' => 404]` for errors.
+- **Transients.** `get_transient()` / `set_transient( $key, $value, $ttl )`. Stored in `wp_options`, or in the object cache when one is installed. Keys are at most 172 characters.
+- **Elementor widgets.**
+  - Extend `\Elementor\Widget_Base`, implementing `get_name`, `get_title`, `get_icon`, `get_categories`, `register_controls` and `render`.
+  - Register on `elementor/widgets/register`. Controls come from `Controls_Manager`.
+  - Read values with `get_settings_for_display()`.
+  - Elementor stores page layouts as JSON in the `_elementor_data` post meta.
+
+### Verification (run on 2026-11-17)
+| Check | Command | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (88 tests, 157 assertions)` |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | 0 errors, 0 warnings |
+| API + shortcodes + widget | `.\scripts\encore.ps1 demo; .\scripts\smoke-api.ps1` | **14 passed, 0 failed** |
+| Cache invalidation | save a show with `wp post update`, read `encore_list_cache_version` | version 52 → 53; 2 cached lists before |
+
+### Practice questions
+
+**Q1. How do you secure a WordPress REST endpoint?**
+A:
+- **`permission_callback`.** Always define one. For write routes check `current_user_can()`, and for cookie-authenticated requests the `X-WP-Nonce` header. For public reads return `true` deliberately.
+- **`args`.** Every parameter gets a schema (type, enum, ranges, pattern), so invalid input gets a 400 before your code runs. Use explicit `validate_callback` + `sanitize_callback`; there's a gotcha when only sanitize is set.
+- **Output.** Return only a whitelisted shape through a serializer, so no internal or private fields leak.
+- **Abuse.** Cap `per_page`, use caching, and add rate limiting at the edge (Cloudflare) for abusive clients.
+
+**Q2. How do you cache something in WordPress and keep it fresh?**
+A: Pick the layer: page cache for whole pages, the object cache or transients for computed fragments like our show grids, and HTTP caching for assets.
+- **Key:** build it from everything that changes the output. We sort the filters, so attribute order doesn't matter.
+- **Invalidation:** tie it to the events that make the data stale: post saves, deletes, trashes and status changes. We bump a version number instead of deleting keys, so it works with any object cache backend.
+- **TTL:** keep a TTL as a safety net.
+
+**Q3. Why build an Elementor widget instead of telling editors to use the shortcode widget?**
+A: A native widget has a real UI. Editors pick city and genre from dropdowns filled from the actual terms, with a live preview, instead of typing attribute syntax and slugs. It's still DRY: the widget's `render()` calls the same filter normaliser and renderer as the shortcode, so there is one query and one cache. The class is only loaded inside Elementor's registration hook, so the plugin works without Elementor installed.
