@@ -392,3 +392,112 @@ A: Pick the layer: page cache for whole pages, the object cache or transients fo
 
 **Q3. Why build an Elementor widget instead of telling editors to use the shortcode widget?**
 A: A native widget has a real UI. Editors pick city and genre from dropdowns filled from the actual terms, with a live preview, instead of typing attribute syntax and slugs. It's still DRY: the widget's `render()` calls the same filter normaliser and renderer as the shortcode, so there is one query and one cache. The class is only loaded inside Elementor's registration hook, so the plugin works without Elementor installed.
+
+---
+
+## Phase 5: Sold-out waitlist
+
+### What was built
+- **Join form.** When a tier is sold out, the ticket panel shows a "Join the waitlist" form. Fields: tier, name, email, optional UAE mobile, 1–4 tickets, consent.
+  - It is a plain POST form to `admin-post.php`, enhanced by `waitlist.js` into a `fetch()` call to `POST /encore/v1/waitlist`.
+  - Both paths run the same `JoinHandler`.
+- **Abuse protection:**
+  - A honeypot field: bots get a fake "success" and nothing is stored.
+  - A per-IP rate limit of 5 attempts per 10 minutes, keyed by an **HMAC of the IP**, so no raw IPs are stored.
+  - A form nonce, checked in the REST `permission_callback`.
+  - A `UNIQUE(show_id, variation_id, email)` key: re-submitting returns your current position.
+- **Double opt-in.** A 64-character random token is emailed. Only its **HMAC hash** is stored, and it is cleared on use, so links are single-use. Unconfirmed entries expire after 48 h through a scheduled action, plus an hourly sweep.
+- **Custom tables**, created with `dbDelta` from `Waitlist\Schema` and versioned with `encore_waitlist_db_version`. `maybe_upgrade()` runs on every load.
+  - `wp_encore_waitlist` has 6 purpose-built indexes.
+  - `wp_encore_waitlist_log` is the audit trail.
+- **State machine** (`Waitlist\Status`): pending → waiting → notified → converted, plus expired and unsubscribed. Re-joining is allowed from expired or unsubscribed. Every change goes through `WaitlistRepository::transition()`: `START TRANSACTION` → `SELECT … FOR UPDATE` → validate → `UPDATE` + audit `INSERT` → `COMMIT`.
+- **Restock detection** (`RestockListener`). On `woocommerce_variation_set_stock`, if stock > 0 and someone is waiting (one indexed COUNT), it enqueues an **Action Scheduler** async job. The stock update itself stays fast.
+- **`WaitlistNotifier`.**
+  - Available tickets = stock − tickets held by open claims.
+  - The FIFO **skip-and-continue** batch selects who to notify. Each selected entry moves to `notified` with a 24 h claim window and gets a signed claim link that pre-fills the cart, and a claim-expiry job is scheduled.
+  - A MySQL `GET_LOCK` per tier serialises concurrent jobs.
+- **Conversion.** On `woocommerce_order_status_processing` / `completed`, any waiting or notified entry with the same billing email and variation becomes `converted`, with the order ID stored.
+- **Emails.** Three `WC_Email` subclasses (confirmation, "you're on the list" with position, "tickets are back"). They are editable under WooCommerce → Settings → Emails, share one theme-overridable template (HTML and plain text), and carry an unsubscribe link plus RFC 8058 `List-Unsubscribe` headers.
+- **Admin: Encore → Waitlists** (`WP_List_Table`).
+  - Filters by show, tier and status, plus email search. Columns include position, qty, status and dates.
+  - Row actions **Notify now** and **Remove**, and the same as bulk actions (nonce + `manage_woocommerce`).
+  - A per-show summary from **one GROUP BY**.
+  - **CSV export** streamed in keyset-paginated chunks of 500, with formula-injection protection.
+  - Editors (`edit_others_posts`) see the screen with **masked emails** and no actions.
+- **Privacy.** Registered personal-data exporter and eraser (Tools → Export/Erase Personal Data), both paged.
+- **`cron` container.** Runs `wp cron event run --due-now` and `wp action-scheduler run` every minute, with `DISABLE_WP_CRON`, the way production should.
+
+### Key decisions and trade-offs (interview talking points)
+| Topic | Decision | Why / trade-off |
+|---|---|---|
+| Queue order | FIFO by **confirmation time**, then id | You're "in line" once you've proven the email is yours. Signing up first but confirming a day later shouldn't jump people who confirmed in minutes. |
+| Large request doesn't fit | **Skip and continue**: notify the smaller requests behind; the skipped entry keeps first place | Strict FIFO would leave tickets unsold. Skipping costs the big group nothing now, and they're first for the next restock. Risk: a big group can be passed over repeatedly when restocks are small. Fix if needed: after N skips, stop offering to others until their quantity accumulates. |
+| Stock holds | **None.** Open claims are only subtracted from what we *offer* | Simple, and no ghost reservations blocking sales. Unfair edge: a non-waitlist buyer can take tickets during someone's claim window. **Real holds:** decrement stock into a "held" bucket (a custom table, or reduce stock and restore on expiry), release on claim expiry by a scheduled job, and convert the hold at checkout. Costs: more states, and stock that looks sold while held. |
+| Custom tables vs CPT + meta | Custom tables | The queue needs `WHERE variation_id = ? AND status = 'waiting' ORDER BY confirmed_at` on a composite index, plus a DB-level UNIQUE constraint. Post meta can provide neither efficiently. |
+| Versioned migrations | Stored schema version + `maybe_upgrade()` on load | Activation hooks don't run on plugin *updates* (deploy via git or copying files). Comparing versions upgrades every site exactly once, and `dbDelta` adds columns and indexes without dropping data. |
+| Transactions | `START TRANSACTION` / `FOR UPDATE` / `COMMIT` on InnoDB | The status change and its audit row are atomic, and the row lock stops a "Notify now" click and a background job from both notifying the same fan. MyISAM ignores transactions, which is one reason WordPress and MySQL 8 default to InnoDB. |
+| Tokens | Store an HMAC **hash**, clear it after use | A DB dump (backup leak, SQL injection elsewhere) can't be turned into working confirm links. HMAC uses a server secret from `wp_salt()`. Comparisons use `hash_equals()`, which runs in constant time. |
+| Claim / unsubscribe links | Stateless HMAC signatures (`claim\|id\|expiry`) | Nothing to store. Changing the id or expiry breaks the signature. Purpose-prefixing stops a claim signature being reused as an unsubscribe one. |
+| Background work | Action Scheduler, not inline | The refund or stock-edit request returns immediately. Mail sending gets retries, logs and a UI (Tools → Scheduled Actions). |
+| Times | UTC in DB (`gmdate`, `UTC_TIMESTAMP()`), local only for display | No daylight-saving or timezone-change bugs in comparisons. |
+| No-JS fallback | `admin-post.php` + Post/Redirect/Get, result *code* in URL | Works without JS, refresh can't resubmit, and no PII lands in URLs or analytics. |
+
+### Index cheat sheet (`wp_encore_waitlist`)
+| Index | Serves |
+|---|---|
+| `UNIQUE show_variation_email (show_id, variation_id, email)` | "already on the list?" lookup and duplicate prevention under concurrency (`INSERT IGNORE`) |
+| `queue (variation_id, status, confirmed_at, id)` | FIFO queue read with no filesort, and "position in line" counts |
+| `status_claim (status, claim_expires_at)` | open-claim sum (soft reservation) and lapsed-claim sweep |
+| `status_created (status, created_at)` | 48 h unconfirmed expiry sweep |
+| `show_status (show_id, status)` | admin filter by show and the GROUP BY summary |
+| `email (email)` | privacy export/erase and order-to-entry conversion match |
+
+`email` is `varchar(190)` because 190 × 4 bytes (utf8mb4) = 760 bytes, which fits InnoDB's 767-byte index prefix limit on older row formats. WordPress core uses 191 for the same reason.
+
+### Bugs found while testing
+1. **Fatal `Class "WC_Email" not found`.** Reading `JoinedEmail::ID` autoloaded the email class (which `extends WC_Email`) on a front-end request where WooCommerce hadn't loaded its email base class yet. Fix: the email IDs moved to `EmailRegistry` constants (a class that doesn't extend anything), and the registry `require`s WooCommerce's base class before instantiating ours. Lesson: in WordPress, touching a class constant can trigger an autoload chain that crosses plugin boundaries.
+2. **REST + logged-in users.** Without an `X-WP-Nonce` header, WordPress treats a cookie request as anonymous, so a form nonce made for a logged-in user wouldn't verify. `waitlist.js` sends both.
+3. **`wp db query` printed nothing** in the CLI container: its MariaDB client fails TLS against MySQL 8. Database checks run through `$wpdb` in `wp eval` instead.
+
+### WordPress concepts
+- **`dbDelta()`.** It diffs a `CREATE TABLE` against the live table. It requires two spaces after `PRIMARY KEY`, `KEY` not `INDEX`, and one column per line.
+- **`$wpdb->prepare()`.** `%d`, `%s` and `%f` placeholders, with `esc_like()` for LIKE searches. Table names and ORDER BY columns can't be placeholders, so they come from code constants or whitelists.
+- **Action Scheduler.** `as_enqueue_async_action`, `as_schedule_single_action`, `as_schedule_recurring_action`, `as_has_scheduled_action` (dedupe), and groups.
+- **`WC_Email`.** Registered through `woocommerce_email_classes`. `trigger()` → `send()`. Templates are loaded with `wc_get_template_html()` and can be overridden by themes.
+- **`WP_List_Table`.** `get_columns`, `get_sortable_columns`, `get_bulk_actions`, `prepare_items`, `column_{name}` and `row_actions`. The bulk nonce is `bulk-{plural}`. Actions are processed on `load-{page_hook}` before output, then redirected.
+- **Privacy API.** `wp_privacy_personal_data_exporters` / `_erasers`. Callbacks are paged, return `done`, and erasers return `items_removed` / `items_retained`.
+- **Capabilities.** `edit_others_posts` lets editors view; `manage_woocommerce` lets shop managers act. Check both a nonce *and* a capability on every action.
+
+### Verification (run on 2026-11-17 and 2026-11-18)
+| Check | Command | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (129 tests, 229 assertions)`. 41 new: BatchSelector 8, Status 18, Signer 6, RateLimiter 4, JoinRequest + mask 5 |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | 0 errors, 0 warnings |
+| Waitlist E2E | `.\scripts\encore.ps1 seed --force; .\scripts\smoke-waitlist.ps1` | **32 passed, 0 failed** |
+| Regression | `smoke-ticketing.ps1`, `smoke-api.ps1` | 12/12, 14/14 |
+| No-JS fallback | POST to `admin-post.php` | redirected to `/shows/…/?waitlist=created` with the "check your email" message |
+| Tables | `information_schema` via `wp eval` | both InnoDB, all 7 + 2 indexes present |
+| Accessibility | Lighthouse mobile on the sold-out show page | 100 |
+
+### Practice questions
+
+**Q1. Walk me through what happens when a refund puts 3 tickets back.**
+A:
+1. WooCommerce restocks the variation, which fires `woocommerce_variation_set_stock`.
+2. `RestockListener` sees stock > 0, runs one indexed COUNT of waiting entries, and enqueues an async Action Scheduler job. The refund request is done.
+3. The cron runner picks up the job. `WaitlistNotifier` takes a MySQL named lock for that tier and computes available = 3 − tickets in open claims.
+4. It reads the FIFO queue from the `queue` index and applies skip-and-continue.
+5. For each chosen fan, it moves the entry `waiting → notified` in a transaction with a row lock and an audit row, sets a 24 h window, emails a signed claim link, and schedules the expiry job.
+6. If a claim lapses, the expiry job marks it `expired` and runs the notifier again for the next fans.
+
+**Q2. Why store a hash of the confirmation token instead of the token?**
+A: Same reason we hash passwords. Anyone who reads the database (a leaked backup, a SQL injection bug elsewhere, a curious admin) shouldn't be able to confirm or hijack entries. We store `HMAC(secret, token)`. The link carries the token, and we hash it again and compare with `hash_equals()` in constant time, so response timing reveals nothing. After use we clear the hash, so the link is single-use. Random 256-bit tokens don't need slow hashing like bcrypt; that's for low-entropy passwords.
+
+**Q3. How do you make a multi-step database change safe under concurrency in WordPress?**
+A:
+- Use InnoDB and wrap the steps in `START TRANSACTION` … `COMMIT`.
+- Lock the row you're deciding on with `SELECT … FOR UPDATE`. Re-check the state *inside* the lock: never trust a value read earlier.
+- Write the change and its audit record, commit, and `ROLLBACK` on any failure.
+- For uniqueness, rely on a `UNIQUE` index with `INSERT IGNORE`, not a check-then-insert race.
+- For "only one worker per resource", use `GET_LOCK()` / `RELEASE_LOCK()`.
+- Do slow side effects such as emails **after** commit, so a failed send doesn't hold locks and a rolled-back change never emails anyone.
