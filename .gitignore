@@ -1,0 +1,78 @@
+# =============================================================================
+# Encore Live — .gitignore
+# Rule: only OUR code is tracked. WordPress core, third-party plugins, uploads,
+# secrets and build output never enter Git.
+# =============================================================================
+
+# --- Secrets & local environment ---------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+auth.json
+
+# --- WordPress core (lives in a Docker volume, never in the repo) -------------
+/wp-admin/
+/wp-includes/
+/wp-*.php
+/index.php
+/license.txt
+/readme.html
+/xmlrpc.php
+wp-config.php
+!docker/**/wp-config*.php
+
+# --- wp-content: ignore everything, then re-include our own code -------------
+/wp-content/*
+!/wp-content/themes/
+/wp-content/themes/*
+!/wp-content/themes/encore-theme/
+!/wp-content/plugins/
+/wp-content/plugins/*
+!/wp-content/plugins/encore-core/
+
+# Uploads, caches and generated files, wherever they appear
+uploads/
+cache/
+upgrade/
+backup*/
+*.sql
+*.sql.gz
+*.log
+debug.log
+
+# --- PHP / Composer ----------------------------------------------------------
+/vendor/
+wp-content/plugins/encore-core/vendor/
+.phpunit.result.cache
+.phpunit.cache/
+.phpcs-cache
+coverage/
+build/
+
+# --- Node / front-end tooling ------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# --- Docker local data -------------------------------------------------------
+docker/data/
+
+# --- OS / editor -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# --- Claude Code local settings ----------------------------------------------
+.claude/settings.local.json
