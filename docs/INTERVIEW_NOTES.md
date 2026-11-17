@@ -571,3 +571,93 @@ A: A daily job marks it archived, the URL 301s to the headliner's artist page, a
 
 **Q3. How do you implement GA4 e-commerce tracking in WooCommerce without double-counting?**
 A: Push the recommended events to the `dataLayer` with the exact `items[]` field names, clearing `ecommerce` between pushes. Configure one GA4 event tag in GTM that forwards them. For `purchase`, push only on the order-received page, and only after checking the order key and an order meta flag. Set the flag when you push, so a refresh or revisit can't resend revenue. Server-side events that happen during a redirecting POST (`add_to_cart`) get queued in the session and printed on the next page. Verify with GTM Preview and GA4 DebugView, and automate a dataLayer check like `analytics-check.mjs`.
+
+---
+
+## Phase 7: Performance (Core Web Vitals)
+
+### What was built
+- **Measurement first.** `scripts/lighthouse.ps1` runs Lighthouse mobile 3× per page, keeps the median report (JSON + HTML) and prints a summary. The baseline was saved before any change: `docs/perf/before/`.
+- **Page cache.** WP Super Cache, configured in `scripts/cache-config.php` and switched by `WP_CACHE` in `.env`. Cart, checkout and account pages are excluded, as are users with cart or login cookies.
+- **Cache purging.** `PageCachePurge` purges a show's page on stock changes, and also the home and archive pages when a show's status changes.
+- **Asset diet** (`inc/performance.php`):
+  - WooCommerce JS/CSS only on shop pages (which drops jQuery entirely elsewhere)
+  - per-block CSS, and no emoji script
+- **Critical CSS.** `critical.css` is inlined via `wp_add_inline_style`; the rest of the CSS loads non-blocking with `rel=preload` and a `<noscript>` fallback.
+- **Fonts.** Self-hosted Archivo (OFL) as `woff2`, latin subset, `font-display: swap`, with the hero weight preloaded.
+- **Images.** WebP output for generated sizes and a 360 w card size in `srcset`.
+- **Report.** `docs/PERFORMANCE.md` has the before/after table and what moved each number.
+
+### Results (real runs, median of 3, mobile)
+| Page | Perf | SEO | LCP | FCP | TTFB |
+|---|---|---|---|---|---|
+| Home | 98 → **100** | 92 → **100** | 2.2 → **1.4 s** | 1.7 → **1.1 s** | 1,300 → **10 ms** |
+| Archive | 99 → **100** | 100 | 1.9 → **1.3 s** | 1.7 → **1.1 s** | 1,000 → **10 ms** |
+| Show | 99 → **100** | 100 | 1.8 → **1.5 s** | 1.7 → **1.2 s** | 830 → **0 ms** |
+
+Accessibility and Best Practices were 100 before and after, and CLS stayed 0. TBT rose 0 → 40 ms on the archive (still "good"). Transfer size fell by 52–59%; render-blocking resources went from 7 to 0.
+
+### Bug found while measuring (strong interview story)
+With the cache "on", TTFB on every URL except `/` stayed around 300 ms. The cache files existed, yet the debug log said "No wp-cache file exists. Must generate a new one" on every request. Reading WP Super Cache's `wp_cache_serve_cache_file()` showed a trailing-slash check: cached files are served only when `$wp_cache_slash_check` matches the permalink style. The settings screen sets it automatically; enabling the cache from code didn't. One line fixed it (`wp_cache_slash_check = 1`), and TTFB went to about 5 ms. **Lesson:** "cache enabled" isn't "cache working". Measure hit rates and TTFB, and read the plugin's debug log.
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Measure before changing | Without a baseline you can't prove a change helped, and can't spot one that hurt (TBT here). The brief also forbids invented numbers. |
+| Page cache first | TTFB sits at the start of every other metric. Nothing on the client can recover 1.3 s of server time. |
+| Purge on stock/status instead of short TTLs | Long cache lifetimes stay safe because we invalidate on the exact events that change the page. |
+| Dequeue WooCommerce assets per page, not globally | Cart, checkout and account still get everything they need. Show pages don't run WooCommerce's JS at all (the tier form is plain HTML). |
+| Critical CSS split by section | Hand-split (sections 1–10 cover anything that can be above the fold on any template) rather than generated per URL. It's simple to maintain, and CLS 0 proves nothing visible is left unstyled. |
+| Self-hosted font despite +28 KB | Brand typography with no third-party DNS/TLS/request (privacy and speed), `swap` so text never hides, and preload so it arrives with the HTML. It's a measured trade-off, not a free win. |
+| WebP via `image_editor_output_format` | Built into WordPress (5.8+), with no plugin or CDN dependency. Applies on upload and regeneration. |
+
+### WordPress concepts
+- **Asset loading:**
+  - `wp_dequeue_script/style` at a late priority on `wp_enqueue_scripts`
+  - the `woocommerce_enqueue_styles` filter
+  - `should_load_separate_core_block_assets`
+  - `style_loader_tag` to rewrite a `<link>`
+  - `wp_register_style( $handle, false )` + `wp_add_inline_style` for inline CSS that can still be dequeued by handle
+- **Images:**
+  - `add_image_size` plus same-ratio sizes enter `srcset` automatically
+  - `wp_get_attachment_image` adds `width`/`height`, `srcset`, `loading` and `decoding`
+  - `image_editor_output_format` for WebP
+  - `wp media regenerate` for existing files
+- **Page caching:**
+  - the `advanced-cache.php` drop-in plus `WP_CACHE` run before WordPress loads
+  - `DONOTCACHEPAGE` (set by WooCommerce on cart/checkout)
+  - cookie-based bypass
+  - purge APIs (`wpsc_delete_post_cache`, `wpsc_delete_url_cache`)
+
+### Verification (run on 2026-11-18)
+| Check | Command | Result |
+|---|---|---|
+| Lighthouse before | `.\scripts\lighthouse.ps1 -Label before` | table above |
+| Lighthouse after | `.\scripts\lighthouse.ps1 -Label after` | table above; per-run 100/100/100 on all pages |
+| TTFB with cache | `curl -w %{time_starttransfer}` × 5 | 4–5 ms on `/`, `/shows/`, show page (was 830–1,300 ms) |
+| Regression with cache on | ticketing / waitlist / SEO / API smoke tests | 12/12, 32/32, 21/21, 14/14 |
+| Unit tests + PHPCS | `test`, `phpcs` | OK (138 tests, 262 assertions); 0 errors |
+
+### Practice questions
+
+**Q1. A WordPress site has a slow LCP. How do you approach it?**
+A: Measure first: Lighthouse or WebPageTest for lab data, Search Console / CrUX for field data. Then split LCP into its parts:
+- **TTFB:** add a page cache, then an object cache; fix slow queries (Query Monitor).
+- **Resource load delay:** make the LCP image discoverable in the HTML with `fetchpriority="high"`, and never lazy-load it.
+- **Resource load time:** right-size it with `srcset`/`sizes`, use WebP/AVIF, serve it from a CDN.
+- **Render delay:** remove render-blocking CSS/JS (critical CSS, `defer`, dequeue unused plugin assets), and preload the fonts used above the fold.
+
+Re-measure after each change. Here TTFB was the dominant part (1.3 s → 10 ms).
+
+**Q2. How do you keep a page cache from showing stale stock on an e-commerce site?**
+A:
+- **Never cache personal pages:** cart, checkout and account set `DONOTCACHEPAGE`, and cart/login cookies bypass the cache.
+- **Purge on the events that change public pages:** stock changes purge that show's page; status changes also purge the listings.
+- **Safety net:** keep a moderate TTL (30 min).
+- **Validate server-side at checkout anyway:** a cached "in stock" label is UX, while WooCommerce's stock check and our purchase policy are the truth.
+
+**Q3. What is critical CSS and what are the risks?**
+A: It's the CSS needed to render above-the-fold content, inlined in `<head>` so the first paint doesn't wait for a stylesheet; the rest loads asynchronously.
+- **Flash of unstyled content and layout shift:** if something visible isn't in the critical CSS, it shows unstyled and then jumps. Check CLS.
+- **Repeat views:** inlined CSS isn't cached separately, so every HTML response carries it. Keep it small; ours is ~24 KB raw, ~6 KB gzipped.
+- **Maintenance drift:** the critical set must stay in sync with templates. That's why ours is split by named sections, not generated per URL.

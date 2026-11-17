@@ -18,7 +18,7 @@
   "endDate": "2026-11-30T22:30:00+04:00",
   "description": "Layla Haddad: Brunch Is a Personality live at The Lantern Room. Observational stand-up about Dubai traffic, family WhatsApp groups and the politics of brunch.",
   "image": [
-    "http://localhost:8080/wp-content/uploads/2026/11/layla-haddad-brunch-is-a-personality.jpg"
+    "http://localhost:8080/wp-content/uploads/2026/11/layla-haddad-brunch-is-a-personality.webp"
   ],
   "typicalAgeRange": "18-",
   "location": {
@@ -52,7 +52,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:26:55+04:00"
+      "validFrom": "2026-11-18T02:55:07+04:00"
     },
     {
       "@type": "Offer",
@@ -61,7 +61,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:26:55+04:00"
+      "validFrom": "2026-11-18T02:55:07+04:00"
     },
     {
       "@type": "Offer",
@@ -70,7 +70,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:26:55+04:00"
+      "validFrom": "2026-11-18T02:55:07+04:00"
     }
   ]
 }
