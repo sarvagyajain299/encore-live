@@ -24,6 +24,15 @@
 	<rule ref="WordPress"/>
 	<rule ref="PHPCompatibilityWP"/>
 
+	<!--
+		PSR-4 autoloading needs the file name to equal the class name
+		(src/Admin/MetaBox.php), which clashes with WordPress's
+		class-meta-box.php convention. We choose PSR-4 for the plugin's classes.
+	-->
+	<rule ref="WordPress.Files.FileName">
+		<exclude-pattern>*/encore-core/src/*</exclude-pattern>
+	</rule>
+
 	<!-- Every translatable string must use one of our text domains. -->
 	<rule ref="WordPress.WP.I18n">
 		<properties>

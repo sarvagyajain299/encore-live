@@ -42,7 +42,11 @@ case "$cmd" in
 		echo "Site: http://localhost:8080  phpMyAdmin: http://localhost:8081  Mailpit: http://localhost:8025"
 		;;
 	down)     dc down ;;
-	install)  dc run "${run_flags[@]}" wpcli sh /scripts/install.sh ;;
+	install)
+		# The plugin's PSR-4 autoloader is generated, not committed.
+		dc run "${run_flags[@]}" tools composer install --no-interaction --no-dev -d wp-content/plugins/encore-core
+		dc run "${run_flags[@]}" wpcli sh /scripts/install.sh
+		;;
 	wp)       dc run "${run_flags[@]}" wpcli wp "$@" ;;
 	composer) dc run "${run_flags[@]}" tools composer "$@" ;;
 	phpcs)    ensure_vendor; dc run "${run_flags[@]}" tools vendor/bin/phpcs "$@" ;;
