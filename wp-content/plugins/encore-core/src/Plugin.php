@@ -8,6 +8,12 @@
 namespace EncoreCore;
 
 use EncoreCore\Admin\MetaBox;
+use EncoreCore\Admin\SettingsPage;
+use EncoreCore\Tickets\AttendeePhoneField;
+use EncoreCore\Tickets\CartValidation;
+use EncoreCore\Tickets\OrderDetails;
+use EncoreCore\Tickets\ShowStatusSync;
+use EncoreCore\Tickets\TicketPanel;
 use EncoreCore\Admin\ShowListColumns;
 use EncoreCore\Cli\CliService;
 use EncoreCore\Content\PostTypes;
@@ -90,7 +96,19 @@ final class Plugin {
 			$services[] = new SearchScope();
 		}
 
+		// Ticketing needs WooCommerce. Without it the site still lists shows.
+		if ( class_exists( 'WooCommerce' ) ) {
+			$services[] = new CartValidation();
+			$services[] = new OrderDetails();
+			$services[] = new AttendeePhoneField();
+			$services[] = new ShowStatusSync();
+			if ( ! is_admin() ) {
+				$services[] = new TicketPanel();
+			}
+		}
+
 		if ( is_admin() ) {
+			$services[] = new SettingsPage();
 			$services[] = new MetaBox( PostTypes::SHOW, __( 'Show details', 'encore-core' ) );
 			$services[] = new MetaBox( PostTypes::ARTIST, __( 'Artist details', 'encore-core' ) );
 			$services[] = new MetaBox( PostTypes::VENUE, __( 'Venue details', 'encore-core' ) );

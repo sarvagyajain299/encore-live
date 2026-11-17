@@ -549,6 +549,38 @@ textarea {
 .ticket-panel__price { font-size: var(--step-2); font-weight: 900; margin-block-end: var(--space-4); }
 .ticket-panel__message { color: var(--c-muted); margin: 0; }
 
+/* Tier selector (markup from encore-core's TicketPanel) */
+.button--block { inline-size: 100%; }
+.tier-form { display: grid; gap: var(--space-4); }
+.tier-form__tiers { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+.tier-form__legend { margin-block-end: var(--space-2); font-weight: 800; }
+.tier {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	grid-template-areas: "radio name price" "radio stock stock";
+	align-items: center;
+	column-gap: var(--space-3);
+	padding: var(--space-3) var(--space-4);
+	border: 2px solid var(--c-border);
+	border-radius: var(--radius-small);
+	background: var(--c-bg);
+	cursor: pointer;
+}
+.tier:hover { border-color: var(--c-muted); }
+.tier:has(input:checked) { border-color: var(--c-accent); background: var(--c-surface-2); }
+.tier:has(input:focus-visible) { outline: 3px solid var(--c-focus); outline-offset: 2px; }
+.tier input { grid-area: radio; inline-size: 1.25rem; block-size: 1.25rem; accent-color: var(--c-accent); }
+.tier__name { grid-area: name; font-weight: 800; }
+.tier__price { grid-area: price; font-weight: 800; }
+.tier__stock { grid-area: stock; color: var(--c-sold-out); font-size: var(--step--1); font-weight: 700; }
+.tier__stock:empty { display: none; }
+.tier--sold-out { cursor: not-allowed; }
+.tier--sold-out .tier__name,
+.tier--sold-out .tier__price { color: var(--c-muted); text-decoration: line-through; }
+.tier-form__qty { display: grid; gap: var(--space-1); }
+.tier-form__qty label { font-weight: 800; }
+.tier-form__hint { margin: 0; color: var(--c-muted); font-size: var(--step--1); }
+
 @media (min-width: 900px) {
 	.show-layout { grid-template-columns: minmax(0, 1fr) 380px; }
 	.show-layout__aside { position: sticky; inset-block-start: calc(var(--header-height) + var(--space-5)); }

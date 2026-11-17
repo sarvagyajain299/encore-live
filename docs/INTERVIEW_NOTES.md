@@ -223,3 +223,98 @@ A:
 - AA contrast tokens checked with Lighthouse/axe, generous tap targets, `prefers-reduced-motion` respected, and no context changes on input.
 
 Then measure it. We ran Lighthouse on five templates and fixed the one contrast failure it found.
+
+---
+
+## Phase 3: WooCommerce ticketing
+
+### What was built
+- **Tier selector** (`Tickets\TicketPanel`). A plain HTML form on the show page, hooked into the theme's `encore_ticket_panel` action.
+  - It posts WooCommerce's standard `add-to-cart` + `variation_id` + `quantity` to the cart page.
+  - Each tier shows its price, "Only N left" when low, or is disabled when sold out.
+  - `assets/js/tickets.js` only limits the quantity list to the chosen tier's remaining stock.
+- **Purchase rules** (`Tickets\PurchasePolicy`, pure). Blocks invalid quantities, cancelled shows, ended or started shows, sold-out shows, and more than *N* tickets per show per order (counted across tiers and existing cart contents). `CartValidation` enforces it at four points:
+  - `woocommerce_add_to_cart_validation` (classic form **and** Store API)
+  - `woocommerce_update_cart_validation` (classic cart quantity edits)
+  - `woocommerce_store_api_product_quantity_maximum` (block cart stepper)
+  - `woocommerce_check_cart_items` (re-check before checkout)
+- **Settings.** Encore → Settings uses the Settings API: max tickets per order (default 6) and a GTM ID field for Phase 6. Stored as one autoloaded option array.
+- **Attendee phone** (`Tickets\AttendeePhoneField`). A required checkout field, registered with the **Additional Checkout Fields API** because the site uses the Checkout *block*. It is validated as a UAE number and stored normalised (`+971501234567`) in order meta `_wc_other/encore/attendee-phone`. `Support\PhoneNumber` holds the pure parser.
+- **Ticket details everywhere** (`Tickets\OrderDetails`).
+  - `woocommerce_get_item_data` adds Show date and Venue to cart and checkout lines (classic and blocks).
+  - `woocommerce_checkout_create_order_line_item` snapshots them as order item meta, so they appear in emails, My Account, the thank-you page and admin. The tier appears via the variation attribute.
+- **Sold-out sync** (`Tickets\ShowStatusSync` → `Shows\ShowStatusUpdater`).
+  - Listens to `woocommerce_variation_set_stock`, `woocommerce_product_set_stock` and `woocommerce_variation_set_stock_status`.
+  - Recalculates with the Phase 1 `ShowStatusCalculator`, saves, and fires `encore_show_status_changed`.
+- **Test payments.** Cash on Delivery (enabled for virtual products) and Check payments, set up by the install script.
+- **Smoke test** `scripts/smoke-ticketing.ps1`. Drives the whole flow over HTTP through the Store API (12 checks).
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Standard add-to-cart form, not a custom AJAX endpoint | It works without JS and reuses WooCommerce's own handler, including stock checks, sessions and notices. The Store API fires the same validation filter, so block-cart and form paths are guarded identically. |
+| Validate in four places | A rule checked only on add-to-cart is bypassable: by editing the quantity in the cart, or by a show being cancelled while a ticket sits in a cart. `woocommerce_check_cart_items` is the last gate before payment. |
+| Sales close at **start time**, not at "archived" status | The archive cron (Phase 6) runs daily. Relying on status would leave hours where a started show is still buyable. |
+| Additional Checkout Fields API | The checkout is the block version, which ignores `woocommerce_checkout_fields`. The new API renders the field, validates server-side, saves to order meta and shows it in admin and emails, without custom React. |
+| Normalise phone to E.164 | One canonical format makes duplicate detection, SMS gateways and the Phase 5 waitlist reliable. |
+| Snapshot show date and venue onto order items | Orders are legal records. If the show is re-dated, the order must still say what was sold at the time. |
+| Status updates through hooks on stock writes | Every path that changes stock (sale, refund restock, cancel, admin edit) goes through WooCommerce's stock functions, so one listener covers them all. |
+
+### How a real payment gateway would plug in
+WooCommerce gateways are classes extending `WC_Payment_Gateway`, added via the `woocommerce_payment_gateways` filter. For the Checkout block they also register a JS integration (`registerPaymentMethod`). For a UAE launch you would install the provider's official plugin (for example Stripe, Checkout.com, Telr or Network International). Then:
+- **Keys:** API keys go in `wp-config` constants or environment variables, never in the database export or Git.
+- **Webhooks:** enable them, because they are what marks orders paid when the customer closes the 3-D Secure tab.
+- **Test mode:** test in sandbox mode with test cards.
+
+Nothing in our code changes: the gateway moves the order to `processing`, WooCommerce reduces stock, and our `ShowStatusSync` reacts to the stock change.
+
+### WordPress / WooCommerce concepts
+- **Variable products.** The parent holds attributes (`Tier: General | Premium | VIP`). Each variation has its own price, stock and SKU. Stock quantity *is* the capacity.
+- **Validation filters return a boolean.** Returning `false` from `woocommerce_add_to_cart_validation` cancels the add. `wc_add_notice( $msg, 'error' )` tells the customer why. The Store API turns those notices into a 400 JSON error.
+- **Store API vs REST API.** `/wc/store/v1` is the public, cart-session-based API used by the blocks, protected by a `Nonce` header. `/wc/v3` is the authenticated admin API (keys/OAuth).
+- **Order item meta.** A key without an underscore is shown to customers and admins. A key with a leading underscore (`_encore_show_id`) is hidden and used for lookups.
+- **Settings API.** `register_setting()` with a `sanitize_callback`, plus `settings_fields()`, which prints the nonce. `options.php` checks the `manage_options` capability. The page renders sections and fields; WordPress saves.
+
+### Verification (run on 2026-11-17)
+| Check | Command | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (80 tests, 130 assertions)` |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | 0 errors, 0 warnings |
+| E2E ticketing | `.\scripts\smoke-ticketing.ps1` | **12 passed, 0 failed** |
+| No-JS form | POST the show page form to `/cart/` | 2 General tickets in cart, with Show date + Venue item data |
+| Order email (Mailpit) | "Your Encore Live order has been received!" | contains "– Tickets - General", Show date, Venue, `+971…` attendee mobile |
+| Accessibility | Lighthouse mobile, show page with tier selector | 100 |
+
+What the smoke test covers:
+- adding 4 tickets, with 7 rejected ("up to 6")
+- a cancelled show rejected
+- an invalid phone rejected and a valid phone stored as `+971507654321`
+- line items carrying date, venue and tier
+- stock set to 2/0/0 → buying the last 2 flips the show to `sold_out`
+- refunding 1 with restock → stock 1 → `on_sale`
+
+### Bugs found while testing
+- WooCommerce rejected `inputmode` as an additional-field attribute and logged a `_doing_it_wrong` notice. Removed. WooCommerce whitelists the attributes it allows.
+- The WP-CLI `shop_order_refund create` command doesn't expose `line_items`/`restock_items`. The smoke test calls `wc_create_refund()`, the same function the admin Refund button uses.
+
+### Practice questions
+
+**Q1. How do you stop someone buying 50 tickets when the limit is 6?**
+A: Server-side, at every point the cart can change:
+- add-to-cart validation, which counts what is already in the cart for that show across all tiers
+- cart-update validation
+- a Store API quantity maximum for the block cart's stepper
+- a final `woocommerce_check_cart_items` pass before payment
+
+Client-side limits are only UX. The rules live in a pure `PurchasePolicy` class with unit tests. One determined buyer could still place several orders, so for real abuse I'd add a per-customer limit: count by billing email or account across orders, plus rate limiting.
+
+**Q2. The last ticket sells. What updates the show to "Sold out"?**
+A:
+1. WooCommerce reduces variation stock when the order is placed or paid, which fires `woocommerce_variation_set_stock`.
+2. `ShowStatusSync` maps the variation to its parent product, then to the show through the `_encore_show_id` product meta.
+3. It calls `ShowStatusUpdater::refresh()`. That reads every tier's stock, asks `ShowStatusCalculator`, saves `sold_out`, and fires `encore_show_status_changed`.
+
+A refund with "restock" calls the same stock functions, so the show returns to `on_sale` automatically. The smoke test checks both directions.
+
+**Q3. Classic checkout vs Checkout block: what changes for a developer?**
+A: The block checkout is React, talking to the Store API, so PHP filters that edit checkout HTML or `woocommerce_checkout_fields` don't apply. For fields you use the Additional Checkout Fields API (PHP registration, server-side validate/sanitize hooks). For cart line data, `woocommerce_get_item_data` still works because the Store API reads it. For order creation, `woocommerce_checkout_create_order_line_item` still fires. Payment gateways need a JS registration as well as the PHP class. Always test both the classic path and the Store API path, as our smoke test does.

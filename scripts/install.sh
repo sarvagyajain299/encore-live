@@ -83,6 +83,11 @@ wp option update woocommerce_coming_soon 'no'
 wp option update woocommerce_onboarding_profile '{"skipped":true}' --format=json
 wp wc tool run install_pages --user="$WP_ADMIN_USER" >/dev/null
 
+echo "==> Test payments only: Cash on Delivery (also for virtual tickets) and Check payments"
+wp wc payment_gateway update cod --enabled=true --user="$WP_ADMIN_USER" >/dev/null
+wp option patch update woocommerce_cod_settings enable_for_virtual yes
+wp wc payment_gateway update cheque --enabled=true --user="$WP_ADMIN_USER" >/dev/null
+
 echo ""
 echo "Done. Site:  $WP_URL"
 echo "      Admin: $WP_URL/wp-admin  (user: $WP_ADMIN_USER)"
