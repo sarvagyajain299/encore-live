@@ -18,6 +18,7 @@ use EncoreCore\Tickets\CartValidation;
 use EncoreCore\Tickets\OrderDetails;
 use EncoreCore\Tickets\ShowStatusSync;
 use EncoreCore\Tickets\TicketPanel;
+use EncoreCore\Waitlist\WaitlistModule;
 use EncoreCore\Admin\ShowListColumns;
 use EncoreCore\Cli\CliService;
 use EncoreCore\Content\PostTypes;
@@ -110,6 +111,7 @@ final class Plugin {
 			$services[] = new OrderDetails();
 			$services[] = new AttendeePhoneField();
 			$services[] = new ShowStatusSync();
+			$services[] = new WaitlistModule();
 			if ( ! is_admin() ) {
 				$services[] = new TicketPanel();
 			}
