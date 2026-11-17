@@ -137,3 +137,89 @@ A: Meta queries (`meta_key` sort, `meta_query` filters) on `wp_postmeta` get slo
 3. Add an object cache (Redis).
 4. Use `no_found_rows` where we don't paginate.
 Phase 5 shows the custom-table approach for the waitlist.
+
+---
+
+## Phase 2: Custom theme (mobile-first)
+
+### What was built
+- **`encore-theme`.** A classic PHP theme built from scratch.
+  - `functions.php` only requires `inc/setup.php`, `inc/assets.php`, `inc/template-tags.php`, `inc/az-menu.php` and `inc/elementor.php`.
+  - Templates: `front-page`, `archive-encore_show`, `single-encore_show`, `single-encore_artist`, `archive-encore_artist`, `single-encore_venue`, `404`, `search`, `page`, `index`, plus `template-full-width.php` for Elementor.
+  - Template parts: show card, artist card, entry card, ticket CTA, sticky ticket bar, filters, breadcrumbs, A–Z panel.
+- **Plugin read API** (the theme stays presentation-only):
+  - `Shows\Show` is the read model and `Shows\ShowRepository` loads it.
+  - `Shows\ShowQueryArgs` is the single query builder for archive, shortcode, REST and Elementor.
+  - `Shows\ArchiveFilters` handles `query_vars` and `pre_get_posts`.
+  - `Shows\ArtistIndex` maintains the lookup meta. `Shows\SearchScope` limits search results.
+  - `src/template-functions.php` holds the functions the theme may call.
+- **Shows A–Z mega-menu.** Built from artists, grouped by letter ("The …" files under the next word), cached in a transient that is dropped when an artist changes.
+- **Archive filters.** City, genre, month and upcoming/past, as plain `GET` params (`?show_city=dubai&show_genre=comedy`).
+- **Accessibility:**
+  - skip link, landmarks, `aria-expanded` disclosures with Escape and outside-click to close
+  - visible `:focus-visible`, 44–48 px tap targets, AA contrast tokens
+  - `prefers-reduced-motion`, no auto-submitting selects
+- **Elementor.** Header and footer theme locations, a full-width template, and Elementor enabled only for pages and posts (`elementor_cpt_support`), so shows stay theme-rendered.
+- **Assets.** One CSS file and one deferred vanilla-JS file, versioned by `filemtime`. An inline `no-js`→`js` swap avoids a flash of the open mobile menu.
+- **RTL.** All layout uses logical properties (`margin-inline`, `inset-block-end` …). `rtl.css` only fixes direction-dependent visuals.
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Theme calls `encore_get_show()`, never `get_post_meta( '_encore_start' )` | Presentation and storage are decoupled. If shows move to a custom table, no template changes. Every template checks `function_exists`, so the site doesn't fatal if the plugin is off. |
+| One `ShowQueryArgs` builder | The archive, artist page, venue page, home page (and in Phase 4 the shortcode, REST and Elementor) all filter identically. It is pure, so it has 14 unit tests. |
+| Artist **index meta** (`_encore_artist`, one row per artist) | The artist list is a serialized array (it keeps the headliner order). Querying it would need `LIKE '%i:18;%'`, which is slow and can false-match. The index rows give an exact `=` match. |
+| Filters as a GET form, no auto-submit | Works without JS, URLs are shareable and bookmarkable, back button works. Auto-submit on `change` breaks WCAG 3.2.2 for keyboard and screen-reader users. |
+| Stretched-link cards | The whole card is clickable but has one link, so screen readers announce each show once, not three times. |
+| `fetchpriority="high"` + eager on the hero only, `loading="lazy"` elsewhere | The hero image is the LCP element. Lazy-loading it would delay LCP. Explicit `sizes` lets the browser choose from `srcset` before CSS loads. |
+| Map as a link, not an iframe | An embedded map adds hundreds of KB of third-party JS per venue page. |
+| Transient for the A–Z data | The menu is on every page. Caching turns a query plus grouping into one option read (or a Redis hit with an object cache). |
+| Elementor only for pages/posts | Marketers get a page builder, while show pages keep their fast templates and our structured data. |
+
+### WordPress concepts
+- **Template hierarchy.** For `/shows/layla-…/`, WordPress tries `single-encore_show-{slug}.php`, then `single-encore_show.php`, `single.php`, `singular.php`, and finally `index.php`. For `/shows/` it tries `archive-encore_show.php`, then `archive.php`, then `index.php`. `front-page.php` beats everything for the home page.
+- **`get_template_part( $slug, $name, $args )`.** Since 5.5 it passes `$args` to the part, so there is no need for globals.
+- **`pre_get_posts`.** Changes the main query *before* SQL runs. Guard it with `is_main_query()` and `! is_admin()`, otherwise you change widget queries and admin screens too.
+- **`query_vars`.** WordPress ignores unknown URL params. Registering `show_city` makes `get_query_var( 'show_city' )` work and lets WordPress parse it into the main query.
+- **Enqueueing.** Use `wp_enqueue_style` and `wp_enqueue_script`, never hard-coded tags, so dependencies, versions and dequeueing work. The `strategy => 'defer'` argument (WP 6.3+) prints `defer`.
+- **Transients.** A key/value cache with expiry, stored in options (or the object cache). Invalidate them on the events that make them stale.
+- **Theme supports.** `title-tag` lets WordPress and Yoast own the `<title>`. `post-thumbnails`, `html5`, `custom-logo`. `yoast-seo-breadcrumbs` makes Yoast output breadcrumbs plus BreadcrumbList schema.
+
+### Bugs found while testing
+1. Show-card headings rendered as literal `< class="show-card__title">`. When no `heading` argument was passed, the guard returned `$args['heading']` (null) instead of the default. Fix: resolve the default first, then validate.
+2. Lighthouse flagged contrast 3.74:1 on cancelled cards. `opacity: 0.75` on the whole card faded the text too. Fix: dim only the image and switch the date to the muted colour token.
+
+### Verification (run on 2026-11-17)
+| Check | How | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (48 tests, 94 assertions)` (14 new for `ShowQueryArgs`) |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | exit 0 |
+| Filters | `GET /shows/?show_city=dubai&show_genre=comedy` | 2 shows (expected 2) |
+| Artist index | `/artists/nova-saleh/` | 2 upcoming shows, including the double bill where she is second-billed |
+| A–Z menu | Puppeteer script: Enter, Escape, outside click | opens; Escape closes and returns focus; outside click closes |
+| Mobile overflow | Puppeteer at 390×844 | `scrollWidth` 390 = viewport (no horizontal scroll) |
+| Lighthouse a11y (mobile) | `npx lighthouse <url> --only-categories=accessibility --form-factor=mobile` | home 100, archive 100, show 100, artist 100, venue 100 |
+
+SEO scored 58 locally. That is expected: the dev site is deliberately `noindex` (`blog_public=0`), and meta descriptions come in Phase 6.
+
+### Practice questions
+
+**Q1. A request comes in for `/shows/?show_city=dubai`. Walk through what happens.**
+A:
+1. WordPress parses the URL. The rewrite rule for the `encore_show` archive matches, and `show_city` is kept because we registered it with the `query_vars` filter.
+2. `WP_Query` is built and `pre_get_posts` fires. `ArchiveFilters::apply()` sees it is the main query on that archive, calls `ShowQueryArgs::build()`, and sets `meta_query`, `tax_query` and `orderby`.
+3. SQL runs, then the template hierarchy picks `archive-encore_show.php`.
+4. The loop calls `encore_get_show()` for each post, and the card part renders it with escaped output.
+
+**Q2. Why not just call `new WP_Query` in the archive template with your filters?**
+A: Because the main query has already run by the time the template loads. A second query doubles the database work, and pagination, `found_posts`, 404 handling and SEO plugins would all be looking at the wrong (unfiltered) main query. `pre_get_posts` changes the one query WordPress was going to run anyway.
+
+**Q3. How do you make a WordPress theme accessible?**
+A:
+- Semantic landmarks (`header`, `nav` with labels, `main`, `footer`) and a skip link to `main`.
+- Logical heading order, and visible focus styles via `:focus-visible`.
+- Disclosure widgets with `aria-expanded` and `aria-controls`, plus Escape to close with focus returned to the button.
+- Alt text that is empty for decorative images and descriptive for meaningful ones.
+- AA contrast tokens checked with Lighthouse/axe, generous tap targets, `prefers-reduced-motion` respected, and no context changes on input.
+
+Then measure it. We ran Lighthouse on five templates and fixed the one contrast failure it found.
