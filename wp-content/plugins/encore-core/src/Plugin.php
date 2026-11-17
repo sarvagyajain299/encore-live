@@ -9,6 +9,10 @@ namespace EncoreCore;
 
 use EncoreCore\Admin\MetaBox;
 use EncoreCore\Admin\SettingsPage;
+use EncoreCore\Integrations\Elementor\ElementorIntegration;
+use EncoreCore\Rest\ShowsController;
+use EncoreCore\Shows\Shortcodes;
+use EncoreCore\Shows\ShowListRenderer;
 use EncoreCore\Tickets\AttendeePhoneField;
 use EncoreCore\Tickets\CartValidation;
 use EncoreCore\Tickets\OrderDetails;
@@ -89,6 +93,10 @@ final class Plugin {
 			new Taxonomies(),
 			new MetaRegistry(),
 			new ArtistIndex(),
+			new ShowListRenderer(), // Registers cache invalidation hooks (needed in admin too).
+			new Shortcodes(),
+			new ShowsController(),
+			new ElementorIntegration(),
 		);
 
 		if ( ! is_admin() ) {
