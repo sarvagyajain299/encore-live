@@ -9,6 +9,9 @@ namespace EncoreCore;
 
 use EncoreCore\Admin\MetaBox;
 use EncoreCore\Admin\SettingsPage;
+use EncoreCore\Analytics\DataLayer;
+use EncoreCore\Seo\YoastIntegration;
+use EncoreCore\Shows\ArchiveJob;
 use EncoreCore\Integrations\Elementor\ElementorIntegration;
 use EncoreCore\Rest\ShowsController;
 use EncoreCore\Shows\Shortcodes;
@@ -98,6 +101,8 @@ final class Plugin {
 			new Shortcodes(),
 			new ShowsController(),
 			new ElementorIntegration(),
+			new YoastIntegration(),
+			new ArchiveJob(),
 		);
 
 		if ( ! is_admin() ) {
@@ -114,6 +119,7 @@ final class Plugin {
 			$services[] = new WaitlistModule();
 			if ( ! is_admin() ) {
 				$services[] = new TicketPanel();
+				$services[] = new DataLayer();
 			}
 		}
 

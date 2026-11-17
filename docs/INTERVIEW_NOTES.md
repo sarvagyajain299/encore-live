@@ -501,3 +501,73 @@ A:
 - For uniqueness, rely on a `UNIQUE` index with `INSERT IGNORE`, not a check-then-insert race.
 - For "only one worker per resource", use `GET_LOCK()` / `RELEASE_LOCK()`.
 - Do slow side effects such as emails **after** commit, so a failed send doesn't hold locks and a rolled-back change never emails anyone.
+
+---
+
+## Phase 6: Technical SEO and analytics
+
+### What was built
+- **Event JSON-LD inside Yoast's graph.** `Seo\EventSchemaPiece` extends Yoast's `Abstract_Schema_Piece` and is added via `wpseo_schema_graph_pieces`. The pure `Seo\EventSchemaBuilder` builds:
+  - `ComedyEvent`/`MusicEvent`, with dates carrying the +04:00 offset
+  - `eventStatus` Scheduled/Cancelled and the attendance mode
+  - a `Place` with `PostalAddress` and geo, plus performers
+  - one `Offer` per tier with AED price, InStock/SoldOut and `validFrom`
+  - the organizer and `mainEntityOfPage` linked by `@id`
+- **Yoast configuration as code** (`scripts/seo-config.php`). Title and meta templates per content type, `noindex` for ticket products, breadcrumbs and organisation.
+- **Robots and sitemap** (`Seo\YoastIntegration`). Filtered archives get `noindex, follow`, and archived shows are excluded from the sitemap. WooCommerce already sets `noindex` on cart, checkout and account.
+- **Archiving** (`Shows\ArchiveJob`). A daily WP-Cron event (03:00 Dubai) archives ended shows through the same `ShowStatusUpdater`. Archived show URLs return a **301** to the headliner's artist page.
+- **GTM + GA4 dataLayer** (`Analytics\DataLayer`, `Analytics\EcommerceItems`, `assets/js/analytics.js`). The container ID comes from settings. The events are `view_item_list`, `select_item`, `view_item`, `add_to_cart` (session-queued), `begin_checkout` and `purchase` (once per order, order-key checked).
+- **Verification tooling:**
+  - `scripts/smoke-seo.ps1`: 21 checks.
+  - `tests/e2e/analytics-check.mjs`: 11 checks in real Chrome.
+  - `docs/SEO.md` and `docs/ANALYTICS.md`.
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Event as a Yoast graph piece, not our own `<script>` | One graph per page, nodes linked by `@id`, no duplicate WebPage or Organization data. Search engines get a consistent entity model. |
+| Pure `EventSchemaBuilder` | The Rich Results requirements are encoded as unit tests (required + recommended properties, cancelled behaviour). |
+| Dates with explicit offset | `2026-11-29T20:00:00+04:00` is unambiguous. Without the offset, Google guesses the timezone and the show time can be wrong in search. |
+| Organizer inlined with Yoast's `@id` | Found in testing: Yoast omits its Organization node until a logo is set, which left a dangling reference. |
+| `noindex, follow` on filtered archives, no canonical | Hundreds of parameter combinations would be thin duplicates. `follow` keeps show links crawlable. Yoast correctly drops the canonical on noindex pages, because the two are conflicting signals (my first attempt added both; the test exposed it). |
+| 301 archived shows to the artist | Preserves link equity and lands the visitor on upcoming dates. Remove from the sitemap so crawlers stop hitting redirects. |
+| GTM ID from settings | Staging and production use different containers, and there's no deploy to change tracking. Empty means nothing is printed at all (privacy by default). |
+| Server-side `add_to_cart` via the session | The add happens on a POST that redirects. JS on submit can be lost on unload, and a push during the POST never reaches a browser. |
+| Purchase guarded by order meta + order key | No double revenue on refresh, and no leaking another customer's order totals. |
+
+### Bugs found while testing
+1. **Refresh doubled the tickets.** The tier form posts to `/cart/`. WooCommerce rendered the cart in the POST response, so F5 re-submitted the form: 2 tickets became 4 and the purchase value doubled to AED 600. The analytics test caught it. Fix: `woocommerce_cart_redirect_after_add = yes`, i.e. Post/Redirect/Get.
+2. **Dangling organizer reference.** Fixed as above.
+3. **Local `noindex` hid SEO output.** `blog_public = 0` makes core print `noindex, nofollow` everywhere, and Yoast then skips its robots and canonical tags. The SEO smoke test switches the site to public for its run, as production would be.
+
+### WordPress concepts
+- **Yoast Schema API.** The `wpseo_schema_graph_pieces` filter adds an `Abstract_Schema_Piece` subclass with `is_needed()` and `generate()`. Yoast injects `$context` (canonical, `main_schema_id`, `site_url`) and `$helpers`. Other filters used: `wpseo_robots` and `wpseo_exclude_from_sitemap_by_post_ids`.
+- **WP-Cron.** `wp_schedule_event( $timestamp, 'daily', $hook )` when `! wp_next_scheduled()`, cleared on deactivation with `wp_clear_scheduled_hook`. It's pseudo-cron, triggered by page views, so production should disable it and run it from system cron. We run it from the `cron` container.
+- **Redirects.** `wp_safe_redirect( $url, 301 )` then `exit`. "Safe" means only allowed hosts can be redirect targets (open-redirect protection).
+- **`wp_print_inline_script_tag()`** prints inline scripts so CSP nonce/attribute filters can apply. `wp_json_encode( …, JSON_HEX_TAG )` stops `</script>` breakouts from data.
+
+### Verification (run on 2026-11-18)
+| Check | Command | Result |
+|---|---|---|
+| Unit tests | `.\scripts\encore.ps1 test` | `OK (138 tests, 262 assertions)` |
+| PHPCS | `.\scripts\encore.ps1 phpcs` | 0 errors, 0 warnings |
+| SEO | `.\scripts\smoke-seo.ps1` | **21 passed, 0 failed** |
+| GA4 dataLayer | `node tests/e2e/analytics-check.mjs` (dummy `GTM-TEST123`) | **11 passed, 0 failed** |
+| Regression | waitlist / ticketing / API smoke tests | 32/32, 12/12, 14/14 |
+| Google Rich Results Test | needs a public URL or a manual paste | **not run**: steps in `docs/SEO.md` |
+
+### Practice questions
+
+**Q1. How do you add Event rich results to a WordPress site that already uses Yoast?**
+A: Don't print a second JSON-LD block. Add a graph piece through `wpseo_schema_graph_pieces`: a class extending `Abstract_Schema_Piece` whose `generate()` returns the Event node. Link it to Yoast's nodes by `@id`: `mainEntityOfPage` points at the WebPage and `organizer` at the Organization.
+- **Google requires** `name`, `startDate` with a timezone offset, and `location` with an address.
+- **Google recommends** `endDate`, `eventStatus`, `eventAttendanceMode`, `image`, `description`, `performer`, `organizer`, and `offers` (price, currency, availability, url, validFrom).
+- **Cancelled events** keep the page and set `EventCancelled`.
+
+Then validate with the Rich Results Test and monitor Search Console's Events report.
+
+**Q2. A show has ended. What should happen to its URL, and why?**
+A: A daily job marks it archived, the URL 301s to the headliner's artist page, and it leaves the sitemap. The 301 passes most link equity to a page that's still useful (upcoming dates), and expired events lose rich results anyway. A 404 wastes the backlinks. A 302 tells Google to keep the dead URL. Cancelled shows are different: keep them live with `EventCancelled`, because people search for "is X cancelled".
+
+**Q3. How do you implement GA4 e-commerce tracking in WooCommerce without double-counting?**
+A: Push the recommended events to the `dataLayer` with the exact `items[]` field names, clearing `ecommerce` between pushes. Configure one GA4 event tag in GTM that forwards them. For `purchase`, push only on the order-received page, and only after checking the order key and an order meta flag. Set the flag when you push, so a refresh or revisit can't resend revenue. Server-side events that happen during a redirecting POST (`add_to_cart`) get queued in the session and printed on the next page. Verify with GTM Preview and GA4 DebugView, and automate a dataLayer check like `analytics-check.mjs`.

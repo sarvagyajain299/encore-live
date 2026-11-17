@@ -37,5 +37,7 @@ final class Lifecycle {
 	 */
 	public static function deactivate(): void {
 		flush_rewrite_rules();
+		// Leave no orphaned cron events pointing at code that is no longer loaded.
+		wp_clear_scheduled_hook( \EncoreCore\Shows\ArchiveJob::HOOK );
 	}
 }

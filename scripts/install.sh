@@ -68,6 +68,9 @@ echo "==> Activating our plugin and theme"
 wp plugin activate encore-core
 wp theme activate encore-theme
 
+echo "==> Yoast SEO: titles, meta, noindex rules, breadcrumbs"
+wp eval-file /scripts/seo-config.php
+
 echo "==> Elementor: pages and posts only; show/artist/venue pages stay theme-rendered"
 wp option update elementor_cpt_support '["page","post"]' --format=json
 # Let the theme's colours and fonts apply inside Elementor instead of Elementor's defaults.
@@ -80,6 +83,10 @@ wp option update woocommerce_default_country 'AE'
 wp option update woocommerce_store_city 'Dubai'
 wp option update woocommerce_price_num_decimals 2
 wp option update woocommerce_coming_soon 'no'
+# Post/Redirect/Get after add-to-cart: without it the cart renders in the POST
+# response and a browser refresh re-submits the form (found in Phase 6 testing:
+# refresh silently doubled the tickets in the cart).
+wp option update woocommerce_cart_redirect_after_add 'yes'
 wp option update woocommerce_onboarding_profile '{"skipped":true}' --format=json
 wp wc tool run install_pages --user="$WP_ADMIN_USER" >/dev/null
 

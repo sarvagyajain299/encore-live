@@ -77,6 +77,15 @@ final class ShowRepository {
 	}
 
 	/**
+	 * Every show built during this request (used to describe rendered cards to analytics).
+	 *
+	 * @return array<int, Show>
+	 */
+	public function loaded(): array {
+		return $this->cache;
+	}
+
+	/**
 	 * Run a filtered show query.
 	 *
 	 * @param array<string, mixed> $filters See ShowQueryArgs::build().

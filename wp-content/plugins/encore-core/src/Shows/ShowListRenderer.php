@@ -9,6 +9,7 @@ namespace EncoreCore\Shows;
 
 use EncoreCore\Content\PostTypes;
 use EncoreCore\Contracts\Service;
+use EncoreCore\Support\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -49,15 +50,26 @@ final class ShowListRenderer implements Service {
 	public function render( array $filters, string $list_name ): string {
 		$key    = ListFilters::cache_key( $filters + array( 'list' => $list_name ), $this->version() );
 		$cached = get_transient( $key );
-		if ( is_string( $cached ) ) {
-			return $cached;
+		if ( is_array( $cached ) && isset( $cached['html'], $cached['ids'] ) ) {
+			// Analytics describes every card on the page, so warm the show models it will need.
+			if ( Settings::get( 'gtm_container_id' ) ) {
+				array_map( 'encore_get_show', $cached['ids'] );
+			}
+			return (string) $cached['html'];
 		}
 
 		// The listing never paginates: skip the COUNT(*) query.
 		$query = encore_query_shows( $filters + array( 'paginate' => false ) );
 		$html  = $this->cards( $query->posts, $list_name );
 
-		set_transient( $key, $html, self::TTL );
+		set_transient(
+			$key,
+			array(
+				'html' => $html,
+				'ids'  => wp_list_pluck( $query->posts, 'ID' ),
+			),
+			self::TTL
+		);
 		return $html;
 	}
 
