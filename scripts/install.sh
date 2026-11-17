@@ -64,8 +64,15 @@ if [ "${WP_ENVIRONMENT_TYPE:-local}" = "local" ] || [ "${WP_ENVIRONMENT_TYPE:-lo
 	wp plugin install query-monitor --activate
 fi
 
-echo "==> Activating our plugin"
+echo "==> Activating our plugin and theme"
 wp plugin activate encore-core
+wp theme activate encore-theme
+
+echo "==> Elementor: pages and posts only; show/artist/venue pages stay theme-rendered"
+wp option update elementor_cpt_support '["page","post"]' --format=json
+# Let the theme's colours and fonts apply inside Elementor instead of Elementor's defaults.
+wp option update elementor_disable_color_schemes 'yes'
+wp option update elementor_disable_typography_schemes 'yes'
 
 echo "==> WooCommerce store settings (AED, UAE, no onboarding wizard)"
 wp option update woocommerce_currency 'AED'
