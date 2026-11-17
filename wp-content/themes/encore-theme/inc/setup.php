@@ -43,6 +43,12 @@ function encore_theme_setup(): void {
 
 	// 16:10 card and 16:9 hero. Hard crop keeps every card the same shape (no layout shift).
 	add_image_size( 'encore-card', 720, 450, true );
+	// Same 16:10 ratio, so WordPress lists it in the card's srcset: small screens and
+	// 2-column grids download ~4x fewer pixels (Lighthouse "properly size images").
+	add_image_size( 'encore-card-sm', 360, 225, true );
+	// TODO(sarvagya): stop generating sizes the theme never displays ('1536x1536', '2048x2048').
+	// Hint: filter 'intermediate_image_sizes_advanced', unset those keys, return the array.
+	// Saves disk space and upload time; check with `wp media regenerate --yes` and count files.
 	add_image_size( 'encore-hero', 1600, 900, true );
 }
 add_action( 'after_setup_theme', 'encore_theme_setup' );

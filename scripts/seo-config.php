@@ -24,6 +24,10 @@ update_option(
 			'company_name'                   => 'Encore Live',
 			'website_name'                   => 'Encore Live',
 
+			// Home page (front-page.php): Lighthouse flagged the missing meta description.
+			'title-home-wpseo'               => '%%sitename%% %%sep%% Comedy & Live Music Tickets in the UAE',
+			'metadesc-home-wpseo'            => 'Stand-up comedy and live music in Dubai, Abu Dhabi and Sharjah. See what’s on and buy tickets from Encore Live.',
+
 			// Title and description templates per content type.
 			'title-encore_show'              => '%%title%% Tickets %%sep%% %%sitename%%',
 			'metadesc-encore_show'           => '%%excerpt%%',
