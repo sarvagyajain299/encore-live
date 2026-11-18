@@ -11,6 +11,7 @@ use EncoreCore\Admin\MetaBox;
 use EncoreCore\Admin\SettingsPage;
 use EncoreCore\Analytics\DataLayer;
 use EncoreCore\Performance\PageCachePurge;
+use EncoreCore\Security\Hardening;
 use EncoreCore\Seo\YoastIntegration;
 use EncoreCore\Shows\ArchiveJob;
 use EncoreCore\Integrations\Elementor\ElementorIntegration;
@@ -103,6 +104,7 @@ final class Plugin {
 			new ShowsController(),
 			new ElementorIntegration(),
 			new YoastIntegration(),
+			new Hardening(),
 			new ArchiveJob(),
 		);
 
