@@ -1,0 +1,14 @@
+{
+  "name": "encore-live-e2e",
+  "private": true,
+  "description": "Browser tests for Encore Live. Uses the locally installed Chrome (no browser download).",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "analytics": "node analytics-check.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "puppeteer-core": "23.11.1"
+  }
+}
