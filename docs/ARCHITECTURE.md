@@ -1,6 +1,6 @@
 # Architecture
 
-This page shows the planned target architecture. Parts marked *(Phase N)* do not exist yet.
+All parts below are built. The *(Phase N)* labels show which phase added each part.
 
 ## 1. Request flow
 
@@ -100,7 +100,8 @@ flowchart LR
 
 | Service | Image | Why |
 |---|---|---|
-| `wordpress` | `wordpress:php8.2-apache` | Official image. Builds `wp-config.php` from environment variables, so there are no secrets in files. |
+| `wordpress` | `docker/wordpress/Dockerfile` (official `wordpress:php8.2-apache` + `mod_headers`) | Builds `wp-config.php` from environment variables, so there are no secrets in files. Security headers are set at the server, so cached pages get them too. |
+| `cron` | `wordpress:cli-php8.2` | Runs due WP-Cron events and Action Scheduler jobs every minute (`DISABLE_WP_CRON`), as system cron does in production. |
 | `db` | `mysql:8.0` | Same engine as production. InnoDB gives transactions for the waitlist. |
 | `phpmyadmin` | `phpmyadmin:5.2` | Look inside custom tables while developing. |
 | `mailpit` | `axllent/mailpit` | Catches every email. No real email can escape a dev machine. |

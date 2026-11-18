@@ -52,7 +52,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:55:07+04:00"
+      "validFrom": "2026-11-18T07:28:45+04:00"
     },
     {
       "@type": "Offer",
@@ -61,7 +61,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:55:07+04:00"
+      "validFrom": "2026-11-18T07:28:45+04:00"
     },
     {
       "@type": "Offer",
@@ -70,7 +70,7 @@
       "priceCurrency": "AED",
       "availability": "https://schema.org/InStock",
       "url": "http://localhost:8080/shows/layla-haddad-brunch-is-a-personality/#tickets",
-      "validFrom": "2026-11-18T02:55:07+04:00"
+      "validFrom": "2026-11-18T07:28:45+04:00"
     }
   ]
 }
