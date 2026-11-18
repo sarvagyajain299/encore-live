@@ -1,0 +1,56 @@
+[
+  {
+    "Suite": "PHPCS (WordPress Coding Standards)",
+    "Result": "PASS",
+    "Detail": "117 files, 0 errors",
+    "Command": ".\\scripts\\encore.ps1 phpcs"
+  },
+  {
+    "Suite": "PHPUnit + Brain Monkey",
+    "Result": "PASS",
+    "Detail": "OK (138 tests, 262 assertions)",
+    "Command": ".\\scripts\\encore.ps1 test"
+  },
+  {
+    "Suite": "smoke-ticketing",
+    "Result": "PASS",
+    "Detail": "12 passed, 0 failed",
+    "Command": ".\\scripts\\smoke-ticketing.ps1"
+  },
+  {
+    "Suite": "smoke-waitlist",
+    "Result": "PASS",
+    "Detail": "32 passed, 0 failed",
+    "Command": ".\\scripts\\smoke-waitlist.ps1"
+  },
+  {
+    "Suite": "smoke-seo",
+    "Result": "PASS",
+    "Detail": "21 passed, 0 failed",
+    "Command": ".\\scripts\\smoke-seo.ps1"
+  },
+  {
+    "Suite": "smoke-api",
+    "Result": "PASS",
+    "Detail": "14 passed, 0 failed",
+    "Command": ".\\scripts\\smoke-api.ps1"
+  },
+  {
+    "Suite": "smoke-security",
+    "Result": "PASS",
+    "Detail": "12 passed, 0 failed",
+    "Command": ".\\scripts\\smoke-security.ps1"
+  },
+  {
+    "Suite": "Playwright purchase journey",
+    "Result": "PASS",
+    "Detail": "1 passed (16.0s)",
+    "Command": "cd tests/e2e; npx playwright test"
+  },
+  {
+    "Suite": "GA4 dataLayer journey",
+    "Result": "PASS",
+    "Detail": "11 passed, 0 failed",
+    "Command": "cd tests/e2e; npm run analytics"
+  }
+]

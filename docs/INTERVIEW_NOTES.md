@@ -661,3 +661,71 @@ A: It's the CSS needed to render above-the-fold content, inlined in `<head>` so 
 - **Flash of unstyled content and layout shift:** if something visible isn't in the critical CSS, it shows unstyled and then jumps. Check CLS.
 - **Repeat views:** inlined CSS isn't cached separately, so every HTML response carries it. Keep it small; ours is ~24 KB raw, ~6 KB gzipped.
 - **Maintenance drift:** the critical set must stay in sync with templates. That's why ours is split by named sections, not generated per URL.
+
+---
+
+## Phase 8: QA, hardening and release
+
+### What was built
+- **Hardening:**
+  - `Security\Hardening`: XML-RPC off, user enumeration blocked, generator removed, PHP header fallback.
+  - `DISALLOW_FILE_EDIT` in wp-config.
+  - A thin custom Apache image (`docker/wordpress`) that sets security headers at the **server** and refuses `xmlrpc.php`, dotfiles and `debug.log`. Plus `expose_php = Off` and `ServerTokens Prod`.
+- **`docs/SECURITY.md`.** Hardening table, Nginx equivalents, and a **nonce/capability audit of every state-changing entry point**.
+- **QA:**
+  - `scripts/smoke-security.ps1` (12 checks).
+  - `tests/e2e/specs/purchase.spec.js`, a Playwright test of browse → filter → tier → cart → block checkout → thank-you on a Pixel 7 viewport, using the installed Chrome.
+  - `scripts/qa.ps1` runs **every** suite on freshly seeded data, prints one table and saves `docs/qa-last-run.json`.
+  - `docs/QA.md` maps the brief's manual checklist to evidence.
+- **Release docs:** final `README.md` (features, diagram, setup, tests, screenshots list, "What I'd do next"), `docs/CV_BULLETS.md` (only measured claims), `docs/TODOS.md` (your 16 exercises).
+
+### Why these decisions
+| Decision | Reason |
+|---|---|
+| Security headers in Apache, not only PHP | Page-cache hits are served before WordPress loads, so PHP `send_headers` never runs for them. The server is the only layer that sees every response, including cached HTML and static files. |
+| Apache unsets the app's copy, then sets one value | Found in testing: `wp-login.php` already sends `X-Frame-Options`, and two copies can make browsers treat the header as invalid, silently disabling clickjacking protection. |
+| Block enumeration only for visitors | The block editor calls `/wp/v2/users` for author pickers, so logged-in users keep it. |
+| One QA runner with reseeding between suites | Suites mutate data (sell out shows, refund, join waitlists). Reseeding makes every run independent and repeatable. |
+| CV bullets cite only measured numbers | Interviewers probe numbers. Each one maps to a saved report or test output in the repo. |
+
+### Bugs found in this phase
+1. **Duplicate security headers on `wp-login.php`.** Apache and WordPress both sent `X-Frame-Options`. Fixed with `Header unset` + `Header always set`.
+2. **Playwright 1.48 hung on Node 25** while loading tests (`--list` never returned). 1.65 works. Lesson: when a tool hangs silently, isolate it (`--version` works, `--list` hangs) before blaming your own code.
+3. **Duplicate accessible names.** The Playwright locator `getByLabel('Tickets')` matched 3 elements because the `<aside>` and the `<section>` inside it were both labelled "Tickets" (nested landmarks with the same name). Removed the outer label. A browser test found an accessibility smell that Lighthouse didn't.
+
+### WordPress concepts
+- **Defence in depth.** Server config (headers, file access), wp-config constants (`DISALLOW_FILE_EDIT`), filters (`xmlrpc_enabled`, `rest_pre_dispatch`), and code-level checks (nonces, capabilities, escaping, prepared SQL). Each layer covers what the others miss.
+- **`rest_pre_dispatch`.** Short-circuits any REST request before routing. Returning a `WP_Error` responds immediately.
+- **Capabilities vs roles.** Check capabilities (`manage_woocommerce`, `edit_others_posts`), never role names. Roles are just bundles of capabilities, and sites customise them.
+
+### Verification
+See `docs/QA.md` for the full table from `.\scripts\qa.ps1`.
+
+### Practice questions
+
+**Q1. How would you harden a WordPress site before launch?**
+A:
+- **Patch and permissions:** update core, themes and plugins; remove unused ones; least-privilege DB user and file permissions; `DISALLOW_FILE_EDIT`.
+- **Logins:** strong passwords + 2FA, rate-limit or WAF on `wp-login.php`.
+- **Attack surface:** disable XML-RPC if unused; block user enumeration.
+- **Headers at the server or CDN:** nosniff, frame options, referrer policy, permissions policy, HSTS over HTTPS, then CSP in report-only mode.
+- **No leaks:** hide versions; refuse dotfiles and logs.
+- **Audit the code:** every state-changing action needs a nonce **and** a capability check, input sanitized, output escaped, and SQL prepared. Enforce it with PHPCS/WPCS in CI.
+- **Recovery:** backups with a tested restore, and monitoring.
+
+**Q2. What's the difference between a nonce and a capability check, and why do you need both?**
+A:
+- **A nonce proves intent.** The request came from a form or link this site generated for this user's session recently, which is CSRF protection. It doesn't prove permission, and it's not a secret (anyone who can load the page gets one).
+- **A capability check proves authority.** This user is allowed to do this action, to this object (`edit_post`, `$id`).
+
+Without the nonce, an attacker can trick an admin's browser into acting. Without the capability check, a low-privilege user with a valid nonce can act beyond their role. Public forms, like our waitlist, use a nonce plus rate limiting instead of a capability.
+
+**Q3. How do you test a WordPress/WooCommerce site end to end?**
+A: In layers, each suited to what it catches:
+- **Static analysis:** PHPCS/WPCS for security patterns and standards.
+- **Unit tests** for pure rules (PHPUnit + Brain Monkey, no WordPress needed).
+- **HTTP smoke tests** against the real stack: the WooCommerce Store API, our REST API, emails via Mailpit, and headers.
+- **Browser tests** (Playwright) for real user journeys, including the block checkout's JS.
+- **Lighthouse** for performance, accessibility and SEO budgets.
+
+Run them all from one script on freshly seeded data, so results are repeatable and can run in CI.

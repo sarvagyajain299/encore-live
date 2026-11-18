@@ -68,11 +68,12 @@ The tier form posts to the cart, and WooCommerce redirects (Post/Redirect/Get). 
 `tests/e2e/analytics-check.mjs` (Puppeteer + local Chrome) drives the real journey and inspects `window.dataLayer`:
 
 ```powershell
-# one-time: npm i puppeteer-core@23 (any folder; set NODE_PATH or run from it)
+cd tests\e2e; npm install; cd ..\..        # one-time
 .\scripts\encore.ps1 seed --force
 .\scripts\encore.ps1 wp eval "update_option('encore_settings', array('max_tickets_per_order'=>6,'gtm_container_id'=>'GTM-TEST123'));"
-node tests/e2e/analytics-check.mjs
+cd tests\e2e; npm run analytics
 ```
+(`.\scripts\qa.ps1` does all of this and resets the ID afterwards.)
 Result on 2026-11-18: **11 passed, 0 failed**.
 
 The checks: view_item_list with 9 items and correct fields, select_item, `ecommerce:null` clearing, view_item with 3 tiers, add_to_cart (qty 2, value 300) and not repeated on refresh, begin_checkout, purchase (value 300) not repeated on refresh, and no purchase with a forged order key.

@@ -96,9 +96,10 @@ while ( have_posts() ) :
 				</div>
 			</div>
 
-			<aside class="show-layout__aside" aria-label="<?php esc_attr_e( 'Tickets', 'encore-theme' ); ?>">
+			<?php // No label here: the ticket <section> inside is already the labelled "Tickets" region (found by the Playwright test). ?>
+			<div class="show-layout__aside">
 				<?php get_template_part( 'template-parts/ticket-cta', null, array( 'show' => $encore_show ) ); ?>
-			</aside>
+			</div>
 		</div>
 	</article>
 

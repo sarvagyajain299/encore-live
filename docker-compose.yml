@@ -34,6 +34,8 @@ x-wp-env: &wp-env
     // reachable from inside the container. Real servers use system cron the same way.
     define( 'DISABLE_WP_CRON', true );
     // Page cache (WP Super Cache) on/off per environment from .env.
+    // No theme/plugin code editor in wp-admin: a stolen admin session can't become code execution.
+    define( 'DISALLOW_FILE_EDIT', true );
     if ( ! defined( 'WP_CACHE' ) ) {
       define( 'WP_CACHE', filter_var( getenv_docker( 'WP_CACHE', 'false' ), FILTER_VALIDATE_BOOLEAN ) );
     }
@@ -58,7 +60,8 @@ services:
       start_period: 20s
 
   wordpress:
-    image: wordpress:php8.2-apache
+    build: ./docker/wordpress
+    image: encore-wordpress:php8.2
     restart: unless-stopped
     depends_on:
       db:
