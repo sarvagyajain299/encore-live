@@ -157,7 +157,7 @@ final class WaitlistListTable extends WP_List_Table {
 	protected function column_default( $item, $column_name ): string {
 		switch ( $column_name ) {
 			case 'show':
-				return sprintf( '<a href="%s">%s</a>', esc_url( (string) get_edit_post_link( (int) $item['show_id'] ) ), esc_html( get_the_title( (int) $item['show_id'] ) ) );
+				return sprintf( '<a href="%s">%s</a>', esc_url( (string) get_edit_post_link( (int) $item['show_id'] ) ), esc_html( WaitlistPage::show_label( (int) $item['show_id'] ) ) );
 			case 'position':
 				$position = $this->repo->position( $item );
 				return null === $position ? '&mdash;' : esc_html( '#' . $position );

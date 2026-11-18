@@ -152,6 +152,13 @@ $codes = 1..6 | ForEach-Object { (Join "rl-$_-$run@encore.test" 1).Status }
 Test-Step '6th attempt in the window gets 429' ($codes[5] -eq 429 -and ($codes[0..4] | Where-Object { $_ -eq 429 }).Count -eq 0) ($codes -join ',')
 Clear-RateLimit
 
+# 10. Permanently deleting a show removes its waitlist (custom tables have no foreign keys).
+$tmpShow = Invoke-Wp @('post', 'create', '--post_type=encore_show', '--post_status=draft', "--post_title=Cleanup test $run", '--porcelain')
+$copied = Invoke-WpEval ('global $wpdb; $t = $wpdb->prefix . "encore_waitlist"; $cols = implode( ",", array_diff( $wpdb->get_col( "SHOW COLUMNS FROM $t" ), array( "id", "show_id" ) ) ); echo (int) $wpdb->query( $wpdb->prepare( "INSERT INTO $t (show_id,$cols) SELECT %d,$cols FROM $t WHERE email = %s LIMIT 1", ' + $tmpShow + ', "' + $a + '" ) );')
+Invoke-Wp @('post', 'delete', "$tmpShow", '--force') | Out-Null
+$left = Invoke-WpEval ('global $wpdb; echo (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}encore_waitlist WHERE show_id = %d", ' + $tmpShow + ' ) );')
+Test-Step 'deleting a show permanently removes its waitlist rows' ($copied -eq '1' -and $left -eq '0') "copied=$copied left=$left"
+
 Write-Host ""
 Write-Host "$pass passed, $fail failed"
 if ($fail) { exit 1 }

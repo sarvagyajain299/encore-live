@@ -384,7 +384,20 @@ final class WaitlistRepository {
 	}
 
 	/**
-	 * Delete entries and their log rows (admin "Remove", privacy eraser).
+	 * Every entry ID for one show, whatever its status.
+	 *
+	 * @param int $show_id Show post ID.
+	 * @return int[]
+	 */
+	public function ids_for_show( int $show_id ): array {
+		global $wpdb;
+		$table = Schema::entries();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table; name from code.
+		return array_map( 'intval', $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE show_id = %d", $show_id ) ) );
+	}
+
+	/**
+	 * Delete entries and their log rows (admin "Remove", privacy eraser, show deleted).
 	 *
 	 * @param int[]  $ids   Entry IDs.
 	 * @param string $actor Who deleted (kept in PHP error log only; the log rows go too).
