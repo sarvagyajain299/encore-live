@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "analytics": "node analytics-check.mjs"
+    "analytics": "node analytics-check.mjs",
+    "screenshots": "node screenshots.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

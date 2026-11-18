@@ -47,6 +47,7 @@ final class WaitlistModule implements Service {
 			new RestockListener( $repo ),
 			new ConversionTracker( $repo ),
 			new Privacy( $repo ),
+			new ShowCleanup( $repo ),
 			new WaitlistController( $handler ),
 			new NoJsHandler( $handler ),
 		);

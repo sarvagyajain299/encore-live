@@ -80,7 +80,7 @@ Commands: `up`, `down`, `install`, `seed [--force]`, `reset`, `demo`, `wp <args>
 | PHPCS (WordPress Coding Standards + PHP 8.2 compatibility) | `.\scripts\encore.ps1 phpcs` | 0 errors, 0 warnings |
 | Unit tests (PHPUnit 11 + Brain Monkey) | `.\scripts\encore.ps1 test` | OK (138 tests, 262 assertions) |
 | Ticketing E2E (Store API) | `.\scripts\smoke-ticketing.ps1` | 12 / 12 |
-| Waitlist E2E (REST + Mailpit) | `.\scripts\smoke-waitlist.ps1` | 32 / 32 |
+| Waitlist E2E (REST + Mailpit) | `.\scripts\smoke-waitlist.ps1` | 33 / 33 |
 | REST, shortcodes, Elementor | `.\scripts\smoke-api.ps1` | 14 / 14 |
 | SEO | `.\scripts\smoke-seo.ps1` | 21 / 21 |
 | Security | `.\scripts\smoke-security.ps1` | 12 / 12 |
@@ -88,16 +88,34 @@ Commands: `up`, `down`, `install`, `seed [--force]`, `reset`, `demo`, `wp <args>
 | GA4 dataLayer journey (Puppeteer) | `cd tests\e2e; npm run analytics` | 11 / 11 |
 | Lighthouse mobile (median of 3) | `.\scripts\lighthouse.ps1 -Label x -Lighthouse <path>` | 100 / 100 / 100 performance; see [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) |
 
-## Screenshots to capture
-1. Home page, desktop and phone
-2. Shows archive with filters applied, and the A–Z menu open
-3. Show page with the tier selector, and the sticky mobile bar
-4. Sold-out show with the waitlist form
-5. Cart and checkout with ticket details and the attendee phone field
-6. The three waitlist emails in Mailpit
-7. Encore → Waitlists (admin, then editor with masked emails)
-8. Lighthouse after-reports, plus the Rich Results Test result
-9. GTM Preview / DevTools showing the `purchase` dataLayer event
+## Screenshots
+Captured from the local Docker stack with seeded demo data by [`tests/e2e/screenshots.mjs`](tests/e2e/screenshots.mjs) (`cd tests\e2e; npm run screenshots`).
+
+| Home (desktop) | Home (phone) |
+|---|---|
+| <img src="docs/screenshots/01-home-desktop.png" alt="Home page on desktop: hero for the next show with Get tickets and All shows buttons" width="560"> | <img src="docs/screenshots/02-home-phone.png" alt="Home page on a phone" width="220"> |
+
+| Shows archive, filtered to Dubai comedy | Shows A–Z mega-menu |
+|---|---|
+| <img src="docs/screenshots/03-archive-filtered.png" alt="Shows archive with City, Genre, Month and When filters and two results" width="420"> | <img src="docs/screenshots/04-az-menu.png" alt="Shows A–Z menu open, artists grouped by letter" width="420"> |
+
+| Show page with the tier selector | Sticky "Get tickets" bar (phone) |
+|---|---|
+| <img src="docs/screenshots/05-show-desktop.png" alt="Show page: title, date, venue, doors and age facts, and the ticket panel" width="560"> | <img src="docs/screenshots/06-show-phone-sticky-bar.png" alt="Show page on a phone with the sticky ticket bar at the bottom" width="220"> |
+
+| Sold-out show with the waitlist form | Cart with ticket details (phone) | Block checkout with the attendee phone field (phone) |
+|---|---|---|
+| <img src="docs/screenshots/07-sold-out-waitlist.png" alt="Sold-out show: all tiers sold out and the Join the waitlist form" width="420"> | <img src="docs/screenshots/08-cart-phone.png" alt="Cart showing show date, venue and tier for two General tickets" width="200"> | <img src="docs/screenshots/09-checkout-phone.png" alt="Checkout with payment options and the Attendee mobile number (UAE) field" width="200"> |
+
+| Waitlist emails in Mailpit | "Tickets are back" email |
+|---|---|
+| <img src="docs/screenshots/10-mailpit-inbox.png" alt="Mailpit inbox with confirmation, on-the-list and tickets-are-back emails" width="420"> | <img src="docs/screenshots/11-email-tickets-back.png" alt="Tickets are back email with show, date, tier, quantity and a Claim my tickets button" width="420"> |
+
+| Encore → Waitlists (admin) | Lighthouse mobile, home page (after) |
+|---|---|
+| <img src="docs/screenshots/12-admin-waitlists.png" alt="Waitlists admin screen with per-show summary, filters and entry list" width="420"> | <img src="docs/screenshots/13-lighthouse-home.png" alt="Lighthouse report: 100 for performance, accessibility, best practices and SEO" width="420"> |
+
+Still to add once there is a public URL and real accounts: the Google Rich Results Test result, and GTM Preview showing the `purchase` event (see [`docs/QA.md`](docs/QA.md)).
 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) · [Integration contract](docs/INTEGRATION_CONTRACT.md) · [SEO](docs/SEO.md) · [Analytics](docs/ANALYTICS.md) · [Performance](docs/PERFORMANCE.md) · [Security](docs/SECURITY.md) · [QA](docs/QA.md) · [Interview notes](docs/INTERVIEW_NOTES.md) · [CV bullets](docs/CV_BULLETS.md) · [Your TODOs](docs/TODOS.md) · [PR notes](docs/prs/)

@@ -14,14 +14,14 @@ cd tests\e2e; npm install; cd ..\..    # once
 | PHPCS (WordPress Coding Standards + PHPCompatibility 8.2) | `.\scripts\encore.ps1 phpcs` | PASS: 117 files, 0 errors |
 | PHPUnit + Brain Monkey | `.\scripts\encore.ps1 test` | PASS: OK (138 tests, 262 assertions) |
 | Ticketing E2E (Store API) | `.\scripts\smoke-ticketing.ps1` | PASS: 12 passed, 0 failed |
-| Waitlist E2E (REST + Mailpit + admin + privacy) | `.\scripts\smoke-waitlist.ps1` | PASS: 32 passed, 0 failed |
+| Waitlist E2E (REST + Mailpit + admin + privacy) | `.\scripts\smoke-waitlist.ps1` | PASS: 33 passed, 0 failed (step 33 added after this run, passed on its own) |
 | SEO | `.\scripts\smoke-seo.ps1` | PASS: 21 passed, 0 failed |
 | REST API, shortcodes, Elementor | `.\scripts\smoke-api.ps1` | PASS: 14 passed, 0 failed |
 | Security | `.\scripts\smoke-security.ps1` | PASS: 12 passed, 0 failed |
 | Playwright purchase journey (Pixel 7, Chrome) | `cd tests\e2e; npx playwright test` | PASS: 1 passed (16.0 s) |
 | GA4 dataLayer journey (Puppeteer) | `cd tests\e2e; npm run analytics` | PASS: 11 passed, 0 failed |
 
-Total automated checks: 138 unit tests + 103 smoke checks + 12 browser checks.
+Total automated checks: 138 unit tests + 104 smoke checks + 12 browser checks.
 
 ## The brief's manual checklist → evidence
 
@@ -47,7 +47,7 @@ Each step of the end-to-end story from the brief, and which check exercises it.
 - [ ] **GTM Preview + GA4 DebugView** with a real container and property (`docs/ANALYTICS.md`)
 - [ ] Visual review on a real phone (iOS Safari, Android Chrome) and with a screen reader (NVDA or VoiceOver)
 - [ ] Keyboard-only pass: Tab through home → show → checkout. Focus is always visible and no traps.
-- [ ] Take the screenshots listed in `README.md`
+- [x] README screenshots: `docs/screenshots/`, captured by `cd tests\e2e; npm run screenshots`
 
 ## Bugs found by QA across the project
 Every one was found by a test or a measurement, not by reading code:
@@ -67,3 +67,6 @@ Every one was found by a test or a measurement, not by reading code:
 | 7 | Page cache served only `/` (slash-check setting) | TTFB measurement |
 | 8 | Duplicate `X-Frame-Options` on `wp-login.php` | security smoke |
 | 8 | Duplicate "Tickets" landmark names | Playwright locator |
+| Post | Waitlist rows outlived their deleted show, so the admin listed blank show names | screenshot |
+| Post | Checkout field labels near-invisible (white WooCommerce inputs, light theme text) | screenshot |
+| Post | Cheque gateway showed WooCommerce's "Store Name, Store Street…" placeholder | screenshot |

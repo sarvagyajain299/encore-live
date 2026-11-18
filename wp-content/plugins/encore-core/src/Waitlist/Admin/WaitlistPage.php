@@ -188,7 +188,7 @@ final class WaitlistPage implements Service {
 					$out,
 					array_map(
 						array( self::class, 'csv_safe' ),
-						array( $row['id'], get_the_title( (int) $row['show_id'] ), $row['tier'], $row['name'], $row['email'], $row['phone'], $row['qty'], $row['status'], $row['created_at'], $row['confirmed_at'], $row['notified_at'], $row['converted_order_id'] )
+						array( $row['id'], self::show_label( (int) $row['show_id'] ), $row['tier'], $row['name'], $row['email'], $row['phone'], $row['qty'], $row['status'], $row['created_at'], $row['confirmed_at'], $row['notified_at'], $row['converted_order_id'] )
 					)
 				);
 				$last = (int) $row['id'];
@@ -199,6 +199,17 @@ final class WaitlistPage implements Service {
 
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 		exit;
+	}
+
+	/**
+	 * Show title for admin output, with a label when the show no longer exists.
+	 *
+	 * @param int $show_id Show post ID.
+	 */
+	public static function show_label( int $show_id ): string {
+		$title = get_post( $show_id ) ? get_the_title( $show_id ) : '';
+		/* translators: %d: show post ID. */
+		return '' !== $title ? $title : sprintf( __( 'Deleted show #%d', 'encore-core' ), $show_id );
 	}
 
 	/**
@@ -246,7 +257,7 @@ final class WaitlistPage implements Service {
 						)
 					);
 					?>
-									"><?php echo esc_html( get_the_title( (int) $row['show_id'] ) ); ?></a></td>
+									"><?php echo esc_html( self::show_label( (int) $row['show_id'] ) ); ?></a></td>
 					<td><?php echo esc_html( (string) (int) $row['waiting'] ); ?></td>
 					<td><?php echo esc_html( (string) (int) $row['notified'] ); ?></td>
 					<td><?php echo esc_html( (string) (int) $row['converted'] ); ?></td>

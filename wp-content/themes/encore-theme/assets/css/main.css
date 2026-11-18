@@ -41,3 +41,36 @@
 		scroll-behavior: auto !important;
 	}
 }
+
+/* ---------------------------------------------------------------------------
+ * WooCommerce cart + checkout blocks on the dark theme.
+ * WooCommerce gives its inputs a white background, but the labels inherit our
+ * light text colour, so labels and placeholders were close to invisible
+ * (found while taking the README screenshots).
+ * ------------------------------------------------------------------------- */
+.wc-block-components-text-input input,
+.wc-block-components-textarea,
+.wc-blocks-components-select .wc-blocks-components-select__select,
+.wc-block-components-combobox .wc-block-components-combobox-control input {
+	background-color: var(--c-surface) !important;
+	border-color: var(--c-border) !important;
+	color: var(--c-text) !important;
+}
+.wc-block-components-text-input label,
+.wc-blocks-components-select .wc-blocks-components-select__label,
+.wc-block-components-combobox .wc-block-components-combobox-control label {
+	color: var(--c-muted) !important;
+}
+.wc-block-components-text-input input:focus,
+.wc-blocks-components-select .wc-blocks-components-select__select:focus {
+	border-color: var(--c-accent) !important;
+	box-shadow: 0 0 0 1px var(--c-accent) !important;
+}
+.wc-blocks-components-select .wc-blocks-components-select__expand { fill: var(--c-text); }
+.wc-block-components-button:not(.is-link) {
+	background: var(--c-accent);
+	color: var(--c-accent-ink);
+	border-radius: 999px;
+	font-weight: 700;
+}
+.wc-block-components-button:not(.is-link):hover { background: var(--c-accent-hover); color: var(--c-accent-ink); }

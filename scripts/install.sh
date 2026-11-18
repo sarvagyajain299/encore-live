@@ -100,6 +100,7 @@ echo "==> Test payments only: Cash on Delivery (also for virtual tickets) and Ch
 wp wc payment_gateway update cod --enabled=true --user="$WP_ADMIN_USER" >/dev/null
 wp option patch update woocommerce_cod_settings enable_for_virtual yes
 wp wc payment_gateway update cheque --enabled=true --user="$WP_ADMIN_USER" >/dev/null
+wp option patch update woocommerce_cheque_settings description 'Demo gateway: the order is placed on hold and no money is taken.'
 
 echo ""
 echo "Done. Site:  $WP_URL"
